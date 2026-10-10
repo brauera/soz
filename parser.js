@@ -446,6 +446,8 @@
 
     for (let li = 0; li < lines.length; li++) {
       const lineNo = li + 1;
+      // «> предложение | перевод» и «# p001» — служебные строки распознанного PDF
+      if (/^\s*[>#]/.test(lines[li])) continue;
       const line = preLine(lines[li]);
       if (!line.trim()) continue;
       let lastCard = null;
@@ -549,5 +551,11 @@
     return cards;
   }
 
-  global.AzParser = { parse, azLower, PARSER_VERSION };
+  global.AzParser = {
+    parse,
+    azLower,
+    PARSER_VERSION,
+    // общие помощники для грамматического модуля и поиска
+    util: { normalizeText, fixHomoglyphs, script, isEnglish, wordCount, stripDecor, preLine, hashKey, SEP },
+  };
 })(typeof window !== 'undefined' ? window : globalThis);

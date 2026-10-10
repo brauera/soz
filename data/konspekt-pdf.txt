@@ -1,0 +1,706 @@
+# Söz: слова из рукописного конспекта «Az lessons.pdf» (Google Drive), распознано 10.10.2026
+# Формат: «слово - перевод», предложения: «> азербайджанское | русское», страницы: «# pNNN»
+# p001
+bilmək - знать (что-то, неодушевлённое)
+tanımaq - знать (кого-то, одушевлённое)
+olar - можно
+gərək - следует, нужно
+qoy - пусть; разреши
+ki - чтобы
+həmişə - всегда
+axır ki - finally
+çox güman - скорее всего
+məşğul olmaq - to be busy
+məşğulam - я занят
+# p002
+qulaq asmaq - слушать
+eşitmək - слышать
+layihəni - проект (вин. п.)
+görüşmək - встречаться
+əks halda - иначе
+çata bilmərik - не успеем
+qalmaq - остаться, оставаться
+çoxdan - давно
+yəqin - должно быть
+xırda şeylərə görə - из-за пустяков
+# p003
+narazı - недоволен
+təmir - ремонт
+aparmaq - отводить
+işarəsi - знак
+əvəzedilməz - незаменимый
+mal - товар
+əlifba - алфавит
+ibarət - состоит (из)
+> Bu nədən ibarətdir? | Из чего это состоит?
+# p004
+bu şəkildə - таким образом
+tamamilə yanlışdır - совершенно неверно
+tamamilə düzdür - совершенно верно
+göstərmək - показывать
+göstər - покажи
+yazmaq - писать, написать
+yazılmaq - быть написанным
+oxumaq - читать
+oxunmaq - быть прочитанным
+# p005
+mühüm - важный (для всего)
+vacib - важный (для неодушевлённого)
+hazırda - сейчас, в настоящее время
+şöbə - отдел
+cavabdeh olmaq - быть ответственным
+hesabat - отчёт
+görüş - встреча
+iclas - совещание
+yemək yeyirəm - я ем (еду)
+# p006
+inkişaf etmək - развиваться
+sağ - правый
+sol - левый
+xoşdur - приятно
+qəbul etmək - принимать
+bizim aramızda - между нами
+yorulmaq - уставать
+düz deyirlər - правильно говорят
+təəccüblü - удивительный
+qeyri-adi - необычный
+> Bu son deyil. | Это ещё не конец.
+# p007
+seçmək - выбирать
+belə eləmə - не делай так
+mətbəxdə - на кухне
+soyuducu - холодильник
+həll etmək - решать
+təmiz - чистый
+tənqid etmək - критиковать
+nəzakətli - вежливый
+aparmaq - везти
+özünü aparmaq - вести себя
+# p008
+çalışmaq - стараться
+əmin - уверенный (в чём-то, с -dan/-dən)
+çatmaq - успевать
+paylaşmaq - делиться
+kədərlisən - ты грустный
+həll etmək - разрешить
+yada sal! - вспомни!
+soruşmaq - спрашивать
+dünyada - в мире
+# p009
+haqlı - прав
+haqsız - не прав
+yük - груз
+tələb etmək - требовать
+dəyişmək - изменить, менять
+...-dən başqa - кроме
+çirkli - грязный
+# p010
+yeməklər - блюда
+iştaham yoxdur - у меня нет аппетита
+ac - голодный
+dadsızdır - безвкусно, невкусно
+səhər tezdən - рано утром, очень рано
+dünənki - вчерашний
+sabahkı - завтрашний
+bugünkü - сегодняшний
+yenə - снова
+sabah səhər tezdən - завтра рано утром
+neçə - сколько
+eyni - такой же, одинаковый
+# p011
+daxil olmaq - зайти, войти
+izləmək - смотреть, следить
+...ilə yanaşı - наряду с...
+atəşfəşanlıq - салют
+dinləmək - слушать
+dinləyirəm - слушаю
+məşğul - занят
+mən məşğulam - я занят
+rəsmi şəkildə - официально, официальным образом
+göndərmək - отправить
+bax gör! - ты смотри!
+> İzlə və gör! | Вот увидишь!
+
+# p012
+tədbir - мероприятие
+dondurma - мороженое
+qışda - зимой
+bəzən - иногда
+dərəcə - градус, температура на улице
+hər cür - всякое, любое
+dadmaq - пробовать на вкус, попробовать еду
+çalışmaq - стараться, пытаться
+dadlı, ləzzətli - вкусный (о еде)
+isə - же, а
+anlamaq - понимать
+anlamırlar - они не понимают
+şaxta - мороз
+və ya - или же
+# p013
+nədənsə - почему-то
+bəzi - некоторые
+həmişə - всегда
+ola bilər ki - наверное, может быть
+zövq - вкус, удовольствие
+zövqlə - с удовольствием
+dəyişmək - меняться, менять
+lakin - однако
+təsir etmək - влиять
+məsələn - например
+mürəbbə - варенье
+mürəkkəb - чернила
+bu yaxında - скоро, недавно
+əhvalın - твоё настроение
+ola bilər; görünür; bəlkə də - возможно, видимо
+# p014
+ciddi - серьёзный
+səbəb - причина
+elə belə - просто так
+xüsusi - особенный
+xüsusilə - особенно
+gəmi - корабль
+birdən - вдруг
+geyinmək - одеваться, надевать
+geyindirmək - одевать (кого-то)
+qərar - решение
+qərar vermək - принять решение
+zəlzələ - землетрясение
+dağılmaq - разрушиться
+bəzəmək - украшать
+# p015
+indicə - только что
+bədən - тело
+boğaz - горло
+baş - голова
+boyun - шея
+əl - рука
+diz - колено
+ayaq - нога
+dirsək - локоть
+bel - поясница, спина
+çiyin - плечо
+qarın - живот
+beyin - мозг
+yadda saxlamaq - запоминать
+can - душа
+başqa cür - по-другому
+qabiliyyət - способность, дарование
+# p016
+bir azdan sonra - немного погодя
+> O mənim beynimi xarab elədi. | Он мне весь мозг вынес.
+xarab - сломанный, испорченный, плохой
+heyrətamiz - удивительный
+maraqlı - интересный
+yayılmış - распространённый
+sonraya qoymaq - откладывать
+izah etmək - пояснять
+başa salmaq - объяснять
+duyğu - эмоция, чувство
+ağlama - не плачь
+> Sən niyə kədərlisən? | Почему ты грустный?
+# p017
+sinir - нерв
+sinirli - нервный
+sinirlənmək - нервничать
+əmələ gəlmək - появиться, образоваться
+əhval - настроение
+sadəcə - просто
+həmçinin - также
+sakit - спокойный
+sakit ol - успокойся
+sakitləşdirici - успокаивающее, успокоительное
+sakitləşdirmək - успокаивать
+qarşısını almaq - предотвращать, препятствовать чему-то
+qoruyucu - защищающий, защитный
+# p018
+maddələr - вещества
+ifadə - выражение, утверждение
+artırmaq - увеличивать
+azaltmaq - уменьшать
+yadıma sal - напомни мне
+rastlaşmaq - встречаться
+bağlıdır - связано
+bağlamaq - связывать
+təxəyyül - воображение
+inanılmaz - невероятно, невероятный
+yayılmaq - распространяться
+yaradıcılıq - творчество
+# p019
+parlaq - блестящий, яркий
+gələcək - будущее
+sənin gələcəyin - твоё будущее
+keçmiş - прошлое
+qəbul etmək - воспринимать, принимать
+əlaqə - связь, ассоциация
+top - мяч
+məqalə - статья
+# p020
+düşürəm - спускаюсь
+qalxmaq - подниматься
+yoxlamaq - проверять
+bizim aramızda - между нами
+yüksək - высокий (о температуре)
+hündür - высокий (о человеке, здании)
+alçaq - невысокий, низкий
+yanımda - рядом со мной
+şən - весёлый
+şənlik - веселье, праздник
+sevimli - любимый, милый
+inanmaq - верить
+açıq - светлый (о волосах)
+saç - волосы
+# p021
+eynək - очки
+eynəkdə - в очках
+sarı saç - светлые волосы, блондин
+nədən - о чём?, от чего?
+mehribanlıq - доброта, ласка
+əsəbləşmə - не нервничай
+hirslənmə - не злись
+sinir sistemi - нервная система
+sarı - жёлтый
+göy - синий
+mavi - голубой
+qəhvəyi - коричневый
+boz - серый
+çəhrayı - pink
+# p022
+köpək - собака
+köpəkbalığı - акула
+halbuki - в то время как, хотя
+sayəsində - благодаря, с помощью
+adi - обычный
+qeyri-adi - необычный
+çəki - вес
+çata bilər - может достигать
+ömür - жизнь, продолжительность жизни
+ot - трава
+rast gəlmək - встретить (незапланированно)
+şalvar - брюки
+səliqəli - аккуратный, аккуратно
+kimi - как (кто-то, что-то)
+
+# p023
+müddət - период
+havadan, sudan - о погоде, о воде (о пустяках)
+yandırmaq - включить
+söndürmək - выключить
+yenə - снова
+şikayət - жалоба
+gənc - молодой
+əvəzində - вместо
+yoxsul - бедный
+hanı, haradadır - где?
+zorlamaq - заставлять
+mane olmaq - мешать
+sənət - искусство, ремесло
+incəsənət - искусство, изящные искусства
+ünsiyyət - общение
+# p024
+çağırmaq - звать
+gediş - поездка
+vidalaşmaq - прощаться
+içki - напиток
+həll etmək - решать
+buraxmaq - пропустить, спустить
+kifayət deyil - недостаточно
+zəruridir - необходимо
+anlamaq - понимать
+başa düşmək - понимать
+yayındırmaq - отвлекать
+fürsət - возможность
+# p025
+ünsiyyət qurmaq - общаться
+fürsətçi - хитрожопый, приспособленец
+bunların hamısı - всё это
+qayda - правило
+qaydasında - в порядке
+tabe olmaq - подчиняться
+heç olmasa - хотя бы
+ifadə - выражение
+nitq - речь
+səviyyə - уровень
+yerli mallar - местные товары
+tanış gəlir - кажется знакомым
+yaxşılaşdırmaq - улучшить
+# p026
+ucuz - дёшево
+bahalı - дорогой, дорого
+qayıtmaq - вернуться
+nəsə - что-то
+nəsə oldu? - что-то случилось?
+indicə - только что
+sonuncu - последний
+son - конец
+bu vaxta qədər - до сих пор
+ona baxmayaraq - несмотря на то что
+girmək - поступать
+almaq - взять, купить, получить
+alınmaq - получиться
+daim - постоянно
+nəhayət - наконец
+> Hər şey boşunadır. | Всё напрасно.
+> İndi mən boşam. | Я сейчас свободен.
+# p027
+qoymaq - поставить
+olduğunu - было, being
+əmələ gəlmək - появиться
+ərazi - территория
+izah etmək - объяснять, пояснять
+sübut etmək - доказывать
+sübut - доказательство
+ər-arvad - муж и жена
+uzun - длинный
+uzun müddət - долго
+mənə bax - look at me
+bura bax - look here
+geyinmək - одеваться
+# p028
+əkmək - сажать (в почву)
+yığmaq - собирать
+əvvəlcə - сначала
+əldə etmək - получить
+gördüyünüz kimi - как вы видите
+yəqin ki - наверное
+qocalmaq - стареть
+aldatmaq - обманывать
+heyifsilənmək - сожалеть
+hörmət etmək - уважать
+madam ki - раз уж, ну уж если
+camaat - народ
+xörəklər - блюда
+# p029
+dönmək - повернуть
+mənə dön - повернись ко мне
+yığışmaq - собираться
+yağış - дождь
+sanki - как будто
+dərin - глубокий, глубоко
+ip ucu - намёк
+savadlı - грамотный
+bacarıq - умение
+elə belə - просто так
+fikrimcə - по-моему, по моему мнению
+nəzərdən keçirmək - рассмотреть
+bir də - ещё раз
+# p030
+bişirmək - стряпать, готовить
+bişmək - готовиться, жариться
+xörək bişdi - обед приготовился
+meydana çıxmaq - появляться
+yarışma - соревнование
+dünyaya sülh - миру мир
+əhval - настроение
+məqsəd - цель
+asanlıqla - с лёгкостью
+çevrilmək - превращаться
+qiymətləndirmək - ценить, оценивать
+> Bir də de. | Скажи ещё раз.
+# p031
+hörmət - уважение
+parlaq - яркий
+yaxşılıq - благо
+təbəssüm - улыбка
+alicənab - благородный
+minnətdar - благодарный
+təcrübə - опыт
+özünə inam - уверенность в себе
+artmaq - расти
+artıq - лишнее
+sevindirmək - радовать
+gəlir - доход
+# p032
+zövq - удовольствие
+zövq almaq - получать удовольствие
+saxlamaq - сохранять
+xeyirxah - добрый
+təmiz - честный, чистый
+şən - весёлый
+hadisə - событие
+xatırlamaq - помнить
+bilik - знание
+böyümə - рост
+cəsarət - смелость
+təzə bir şey - что-то новое
+sınamaq - пробовать
+# p033
+sınaq - тест
+nəticə - результат
+səliqəli - аккуратный, аккуратно
+sevgili - любимый
+dünya - мир
+göndərmək - send
+təhlükə - опасность
+təhlükəsizlik - безопасность
+bağlamaq - закрыть, застегнуть, привязать
+tövsiyə - рекомендация, совет
+məsləhət - совет
+
+# p034
+nifrət - ненависть, неприязнь
+səliqəsiz - неаккуратный
+zəhləm gedir - испытывать неприязнь
+olan kimi - as soon as
+pozmaq - нарушать, зачеркнуть
+inanmaq üçün - чтобы поверить, чтобы убедиться
+məqsədi - цель
+inad - упорство, упрямство
+kar - глухой
+kor - слепой
+onsuz da - всё равно
+təkcə - только
+ancaq - только
+# p035
+nə olursa olsun - во что бы то ни стало
+itirmək - потерять
+alqışlamaq - аплодировать
+dəfə - раз
+hələ - still
+daha - more
+artıq - already
+belə - так, такой
+əslində - вообще-то, на самом деле
+> Bu da əldən çıxdı. | С этим покончено.
+# p036
+qarşı - против
+mən qarşıyam - я против
+cəsur - смелый
+açmaq - открыть
+bağlamaq - закрыть
+düşmək - спускаться
+aşağı - вниз
+yuxarı - вверх
+şərab - вино
+şirə - сок
+ola bilməz - не может быть
+# p037
+buraxmaq - отпустить, пускать
+uçmaq - летать
+zibil - мусор
+atmaq - выбросить
+çərçivə - рамка
+hərrac - аукцион
+artmaq - возрастать
+çirk - грязь
+görməzdən gəlmək - игнорировать
+# p038
+şübhə - сомнение
+şübhə edirəm - я сомневаюсь
+sanki - как будто
+xörək - еда, обед
+pozmaq - нарушать
+ofisdəki kompüter - компьютер, который в офисе
+buraxmaq - пропускать
+# p039
+# p040
+uzun-uzun - долго
+isti-isti - горячий
+gülə-gülə - пока (говорят тому, кто уходит)
+hələlik - пока
+bilə-bilə - нарочно
+gəzə-gəzə - гуляя
+qaça-qaça - бегом
+ağlaya-ağlaya - плача
+ağlamaq - плакать
+baxa-baxa qaldı - в ступоре
+# p041
+müəyyən - определённый
+gözləmək - ждать
+daşımaq - тащить
+dəyişmək - изменяться
+ehtimal - вероятность, случай
+hər ehtimala qarşı - на всякий случай
+hər halda - в любом случае
+təsəvvür etmək - представлять
+həddən artıq - чрезмерно
+səhv - ошибка
+borc - долг
+# p042
+ağaclar - деревья
+artmaq - расти
+mane olmaq - мешать
+ayrı - отдельный, разные
+daşımaq - перевозить, тащить
+daş - камень
+mənzərə - вид, панорама
+yəni - то есть
+sanki - будто
+nəqliyyat - транспорт
+# p043
+keyfiyyət - качество
+keyfiyyətli - качественный
+ətraf mühit - окружающая среда
+sadə - простой, просто
+təsvir - описание
+təsvir etmək - описывать
+bacarmaq - уметь (навык)
+yerləşmək - находиться
+məhrum etmək - лишать
+təqaüd - пенсия
+tale - судьба
+fəlakət - катастрофа
+# p044
+hər kəs - каждый
+hər adam - каждый человек
+başlayaq - начнём
+təbii ki - конечно, естественно
+ardıcıl - последовательно
+quruluş - конструкция
+təhlil - анализ
+analiz - анализ
+qoy - пусть
+gəlin - давайте
+azaltmaq - уменьшить
+çoxaltmaq - увеличить
+mümkün qədər - как можно (больше), по возможности
+
+# p045
+uyğun - подходящий, подходит (о времени, условиях)
+şərt - условие
+dəqiq - точно, точный
+nəticə - результат
+yaraşmaq - подходить, идти (о цвете, одежде)
+say - количество
+saymaq - считать
+nümunə - пример
+aşkar - очевидный
+açıq-aşkardır - очевидно
+məqam - момент, аспект, элемент
+məsələ - задача
+tapşırıq - задание
+# p046
+tutmaq - схватить
+tədqiqat - исследование
+müavin - заместитель
+müzakirə - обсуждение
+saxlamaq - сохранять
+tələ - ловушка
+itirmək - терять
+itmək - теряться
+məqamlar - моменты, аспекты, элементы
+təsir etmək - влиять
+təsirli - впечатляющий
+yorulmaq - уставать
+yorğun - усталый
+yormaq - утомлять
+# p047
+birləşdirmək - соединять
+müzakirə etmək - обсудить
+itirmək - потерять
+öz - свой
+özümü - себя
+ara - расстояние, промежуток (между)
+ziddiyyət - противоречие, конфликт
+qalmaq - оставаться, останавливаться
+harada qaldıq - где мы остановились
+harada qaldın - где ты задержался
+əldən vermək - упустить
+fürsət - возможность
+çərçivə - рамка
+# p048
+həqiqətən - на самом деле
+birləşdirmək - объединять
+birləşmək - объединяться
+hissə - часть
+hissələri - части
+bircə - только
+ancaq - только
+əşyalar - вещи
+ərzaq - продукты (питания)
+bişirmək - жарить, варить
+başqa cür - по-другому
+fərqli - другой, отличающийся
+onda - тогда
+susmaq - молчать
+# p049
+aparmaq - нести, уносить, относить
+təmir etmək - ремонтировать
+təmir - ремонт
+mühasibatlıq - бухгалтерия
+geri - обратно, назад
+geri almaq - забрать обратно, отобрать
+bəyənmək - to like
+xoşlamaq - to like
+dayanmaq - останавливаться
+yollamaq - послать
+mövzu - тема
+girmək - входить, вступать
+# p050
+nədənsə - почему-то
+maaş - зарплата
+bilərək - нарочно
+həqiqət - правда
+hər halda - всё равно, в любом случае
+yenə də - всё равно, всё же
+hələ də - всё ещё
+dərhal - сразу
+o dəqiqə - в ту же минуту
+məqalə - статья
+unutmaq - забывать
+# p051
+sındırmaq - сломать
+müharibə - война
+mübahisə - спор
+müqavilə - договор
+mütləq lazımdır - обязательно нужно (непременное условие)
+nəticələr - результаты
+yoxlamaq - проверять
+yaşamaq - жить
+tikmək - строить, построить
+tutmaq - держать, поймать
+kağız - бумага
+məhz - именно
+# p052
+geyinmək - одеваться, надевать
+bəyənmək - нравиться
+sürətli - быстрый, скорый (о машине)
+yarım - половина
+yarım il - полгода
+barışmaq - мириться
+bölmək - делить
+bölüşmək - делиться
+yarışmaq - соревноваться
+öpüşmək - целоваться
+vuruşmaq - драться
+vuruşmayın - не деритесь
+barışın - помиритесь
+# p053
+yenidən - снова
+susmaq - замолчать
+tütün - табак
+izdiham - толпа
+yığılmaq - собираться
+qışqırmaq - кричать
+yarpaqlar - листья
+diş - зуб, зубы
+dişləmək - кусать
+oğru - вор
+izah etmək - пояснить
+başa salmaq - объяснить
+# p054
+mümkündür - возможно
+gülmək - смеяться
+məni güldürmə - не смеши меня
+çatmaq - успеть, дойти
+nəhayət - наконец-то
+çatdı - дошло
+hələ - ещё
+belə - так
+çatan kimi - как только дойду
+çatdırılma - доставка
+tıxac - пробка
+daim - постоянно
+kasıb - бедный
+# p055
+qayda - правило
+çubuq - палка, посох, трость
+qorxmaq - бояться
+öskürmək - кашлять
+imtina etmək - отказаться
+meydan - площадь
+qışqırma - не кричи
+həbsxana - тюрьма
+qazamat - тюрьма, темница
+həbs etmək - арестовать
+ağac - дерево
+

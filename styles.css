@@ -489,3 +489,129 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- предложения на главной ---------- */
+
+.hero-title { font-weight: 700; font-size: 15px; margin-bottom: 12px; }
+.hero-title .muted { font-weight: 500; }
+.hero.done .hero-title { margin-bottom: 6px; }
+.hero-line { display: flex; gap: 18px; margin-bottom: 14px; color: var(--muted); }
+.hero-line b { color: var(--text); font-size: 20px; font-variant-numeric: tabular-nums; margin-right: 4px; }
+.sent-card p { margin-bottom: 0; }
+
+/* ---------- сборка предложения ---------- */
+
+.sent-prompt { padding: 20px 4px 18px; }
+.prompt .word.sent { font-size: clamp(21px, 5.6vw, 27px); font-weight: 650; line-height: 1.3; }
+
+.answer-zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 8px;
+  min-height: 112px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1.5px dashed var(--line);
+  margin-bottom: 16px;
+}
+.answer-zone.ok { border-style: solid; border-color: var(--good); }
+.answer-zone.bad { border-style: solid; border-color: var(--bad); }
+.answer-zone .placeholder { align-self: center; margin: 0 auto; font-size: 15px; }
+
+.bank { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+.tile {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  border-bottom-width: 3px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+  transition: transform .08s ease;
+}
+.tile:active { transform: translateY(1px); }
+.tile.ghost { visibility: hidden; }
+.tile:disabled { opacity: .55; cursor: default; }
+.tile.good { border-color: var(--good); background: var(--good-soft); }
+.tile.bad { border-color: var(--bad); background: var(--bad-soft); }
+.tile.moved { border-color: var(--flame); }
+
+.sent-actions { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+.sent-actions .btn { margin-left: auto; min-width: 150px; min-height: 50px; }
+
+/* ---------- слова: вкладки и строки ---------- */
+
+.top-seg { margin-bottom: 12px; }
+.w[data-act="card"] { cursor: pointer; }
+@media (hover: hover) { .w[data-act="card"]:hover { background: var(--surface-2); } }
+.w.sentence .w-main b { font-weight: 500; }
+
+/* ---------- панель «неверный перевод» ---------- */
+
+body.sheet-open { overflow: hidden; }
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 40%);
+  animation: fade .15s ease-out;
+}
+.sheet[hidden] { display: none; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.sheet-panel {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-radius: 20px 20px 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: rise .2s ease-out;
+}
+.sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 16px 8px; }
+.sheet-head h2 { font-size: 26px; overflow-wrap: anywhere; }
+.sheet-body { overflow-y: auto; padding: 0 16px 20px; display: flex; flex-direction: column; gap: 16px; }
+.sheet-sec h3 { font-size: 15px; margin: 0 0 8px; }
+.small { font-size: 13px; }
+.cur { font-size: 15px; }
+.cur b { color: var(--text); }
+.cands { display: flex; flex-wrap: wrap; gap: 8px; }
+.cand {
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.field input[type="text"] {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.hits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.hits li { padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.hit-src { font-size: 12px; margin-bottom: 2px; }
+.hit-text { font-size: 15px; overflow-wrap: anywhere; }
+mark { background: color-mix(in srgb, var(--flame) 30%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
