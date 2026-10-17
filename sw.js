@@ -1,6 +1,6 @@
 // Кеширует оболочку приложения, чтобы тренажёр открывался без интернета.
 // При изменении любого файла приложения увеличьте номер версии.
-const VERSION = 'soz-v6';
+const VERSION = 'soz-v7';
 const ASSETS = [
   './',
   './styles.css',
@@ -19,7 +19,9 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(VERSION).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // cache: 'reload' — мимо HTTP-кэша браузера, иначе новая версия может сохранить старые файлы
+  const fresh = ASSETS.map((u) => new Request(u, { cache: 'reload' }));
+  event.waitUntil(caches.open(VERSION).then((c) => c.addAll(fresh)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
