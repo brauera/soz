@@ -377,5 +377,53 @@
     return { ok: false, exact: false, order: true };
   }
 
-  global.AzGrammar = { extract, makeTask, buildLexicon, check, tokens, _variants: { verbVariants, caseVariants, pronounVariants } };
+  /* ---------- категории ---------- */
+
+  const TOPICS = {
+    present: 'Настоящее время',
+    past: 'Прошедшее время',
+    future: 'Будущее время',
+    imperative: 'Просьбы и пожелания',
+    modal: 'Нужно, можно, могу',
+    conditional: 'Условие: «если», «бы»',
+    relative: 'Причастия и «который»',
+    converb: 'Деепричастия: -ıb, -anda…',
+    cases: 'Падежи и послелоги',
+    possession: 'Принадлежность, «у меня есть»',
+    voice: 'Залог: -ıl, -dır',
+    idiom: 'Выражения и идиомы',
+  };
+
+  const INDEF = new Set(['kimsə', 'nəsə', 'haçansa', 'haradasa', 'birtəhər', 'necəsə', 'nədənsə']);
+
+  /*
+   * Запасная классификация для предложений, которые ещё не размечены (появились в документе позже):
+   * тема — по самому «продвинутому» окончанию, уровень — по теме и длине.
+   */
+  function classify(az) {
+    const toks = tokens(az).map((t) => azLower(t));
+    const n = toks.length;
+    const any = (re) => toks.some((t) => re.test(t));
+    const last = toks[n - 1] || '';
+    let topic = 'cases';
+    if (toks.includes('əgər') || any(/(saydı|səydi)/) ||
+        toks.some((t) => t.length >= 5 && !INDEF.has(t) && /(sa|sə)(m|n|q|k|nız|niz)?$/.test(t))) topic = 'conditional';
+    else if (toks.includes('ki') || any(/(dığ|diy|duğ|düy|acağ|əcəy)[ıiuü]/)) topic = 'relative';
+    else if (toks.some((t) => t.length >= 5 && /(ıb|ib|ub|üb|araq|ərək|anda|əndə|madan|mədən|dıqda|dikdə|arkən|ərkən)$/.test(t))) topic = 'converb';
+    else if (any(/(ıl|il|ul|ül)(ır|ir|ur|ür|dı|di|du|dü|acaq|əcək)/)) topic = 'voice';
+    else if (any(/^(lazım|gərək|olar|olmaz)|bil(ər|mir|mər)|m[aə]l[ıi]/)) topic = 'modal';
+    else if (toks[0] === 'qoy' || toks[0] === 'gəl' || toks[0] === 'gəlin' || /!$/.test(az.trim()) ||
+        /(aq|ək|alım|əlim|sın|sin|sun|sün)$/.test(last)) topic = 'imperative';
+    else if (any(/(acaq|əcək|acağ|əcəy)/)) topic = 'future';
+    else if (any(/(dı|di|du|dü|tı|ti|tu|tü)(m|n|q|k|nız|niz|nuz|nüz|lar|lər)?$/) || any(/(mış|miş|muş|müş)/)) topic = 'past';
+    else if (/(ır|ir|ur|ür)(am|əm|san|sən|ıq|ik|uq|ük|sınız|siniz|lar|lər)?$/.test(last)) topic = 'present';
+    else if (toks.includes('var') || toks.includes('yox') || toks.includes('yoxdur')) topic = 'possession';
+
+    let level = n <= 6 ? 1 : n <= 9 ? 2 : 3;
+    if (['conditional', 'relative', 'converb', 'voice', 'idiom'].includes(topic)) level = Math.min(3, Math.max(level + 1, 2));
+    else if (topic === 'modal' || topic === 'imperative') level = Math.max(level, 2);
+    return { level, topic };
+  }
+
+  global.AzGrammar = { extract, makeTask, buildLexicon, check, tokens, classify, TOPICS, _variants: { verbVariants, caseVariants, pronounVariants } };
 })(typeof window !== 'undefined' ? window : globalThis);

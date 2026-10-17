@@ -636,3 +636,28 @@ mark { background: color-mix(in srgb, var(--flame) 30%, transparent); color: inh
 .fb-ex-label { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
 .fb-ex [lang="az"] { font-size: 16px; }
 .fb-ex-ru { color: var(--muted); font-size: 14px; margin-top: 3px; }
+
+/* ---------- категории предложений ---------- */
+
+.seg-n { font-weight: 500; color: var(--muted); font-size: 12px; margin-left: 2px; }
+.seg button.on .seg-n { color: var(--accent); }
+.topic-pick { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 14px; font-weight: 600; }
+.topic-pick select {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+}
+.list-topic .topic-pick { margin: 0 0 8px; }
+.list-count { margin: 0 0 10px; }
+.w-main .tags { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+.w-main .tags .chip { font-size: 10px; }
+.chips-line { margin-top: -4px; }
+.chip.topic { text-transform: none; letter-spacing: 0; font-size: 11px; }
+.w-main .tags .chip.topic { font-size: 11px; }

@@ -33,6 +33,7 @@
         newPerDay: 10,
         sentPerDay: 5,
         sentLevel: 'medium',
+        sentTopic: 'all',
         dailyGoal: 20,
         direction: 'auto',
         includeEn: true,
@@ -71,6 +72,9 @@
   let FIXES = null;
   // готовые примеры для слов, которых нет в предложениях конспекта: az → [пример, перевод, форма слова]
   const EXAMPLES_URL = 'data/examples.json';
+  // разметка предложений: id → [уровень 1–3, тема]
+  const META_URL = 'data/sentences-meta.json';
+  let META = null;
   let EXAMPLES = null;
   try { docText = localStorage.getItem(KEY_DOC); } catch (e) { /* нет доступа */ }
 
@@ -144,6 +148,9 @@
       if (Array.isArray(fix)) { s.az = fix[0]; s.ru = fix[1]; }
       // новые предложения из документа ещё никто не вычитывал
       s.checked = fix !== undefined || s.origin === 'pdf';
+      const meta = META ? META[s.id] : null;
+      if (meta) { s.level = meta[0]; s.topic = meta[1]; }
+      else Object.assign(s, AzGrammar.classify(s.az));
       if (!sents.has(s.id)) sents.set(s.id, s);
     }
     SENTS = [...sents.values()];
@@ -191,10 +198,12 @@
     return p.b >= LEARNED_BOX ? 'learned' : 'learning';
   }
 
-  function newToday(store) {
+  // сколько новых начато сегодня — в пределах набора (у каждого уровня предложений свой лимит)
+  function newToday(store, list) {
     const t = today();
     let n = 0;
-    for (const id in store) if (store[id].f === t) n++;
+    if (list) { for (const c of list) if (store[c.id] && store[c.id].f === t) n++; }
+    else { for (const id in store) if (store[id].f === t) n++; }
     return n;
   }
 
@@ -207,12 +216,12 @@
       if (p.d <= t) due++;
       if (p.b >= LEARNED_BOX) learned++; else learning++;
     }
-    const newLeft = Math.min(fresh, Math.max(0, perDay - newToday(store)));
+    const newLeft = Math.min(fresh, Math.max(0, perDay - newToday(store, list)));
     return { due, fresh, learning, learned, newLeft, total: list.length };
   }
 
   const counts = () => countsFor(ACTIVE, S.progress, S.settings.newPerDay);
-  const sentCounts = () => countsFor(SACTIVE, S.sprogress, S.settings.sentPerDay);
+  const sentCounts = () => countsFor(sentPool(), S.sprogress, S.settings.sentPerDay);
 
   function dayStat(d) { return S.days[d] || { a: 0, c: 0 }; }
 
@@ -337,6 +346,13 @@
     } catch (e) { /* без PDF работаем только с документом */ }
   }
 
+  async function loadMeta() {
+    try {
+      const res = await fetch(META_URL);
+      if (res.ok) META = await res.json();
+    } catch (e) { /* без разметки уровень и тема определяются по окончаниям */ }
+  }
+
   async function loadExamples() {
     try {
       const res = await fetch(EXAMPLES_URL);
@@ -394,7 +410,7 @@
   let view = 'home';
   let session = null;
   let q = null;
-  let wordsUi = { tab: 'words', query: '', filter: 'all', limit: 150 };
+  let wordsUi = { tab: 'words', query: '', filter: 'all', topic: 'all', limit: 150 };
 
   function orderNew(list) {
     const o = S.settings.order;
@@ -403,15 +419,14 @@
     return list.slice().sort((a, b) => (S.discovered[b.id] || 0) - (S.discovered[a.id] || 0) || b.line - a.line);
   }
 
-  function buildQueueFor(list, store, perDay, max, extraNew, freshFilter) {
+  function buildQueueFor(list, store, perDay, max, extraNew, arrange) {
     const t = today();
     const due = list
       .filter((c) => { const p = store[c.id]; return p && p.d <= t; })
       .sort((a, b) => store[a.id].d - store[b.id].d || store[a.id].b - store[b.id].b);
-    const quota = extraNew != null ? extraNew : Math.max(0, perDay - newToday(store));
+    const quota = extraNew != null ? extraNew : Math.max(0, perDay - newToday(store, list));
     const unseen = orderNew(list.filter((c) => !store[c.id]));
-    // сначала подходящие по фильтру (например, по длине предложения), потом остальные
-    const fresh = (freshFilter ? unseen.filter(freshFilter).concat(unseen.filter((c) => !freshFilter(c))) : unseen).slice(0, quota);
+    const fresh = (arrange ? arrange(unseen) : unseen).slice(0, quota);
     const reviews = due.slice(0, Math.max(Math.ceil(max / 4), max - fresh.length));
     // новые равномерно между повторениями
     const out = [];
@@ -426,19 +441,35 @@
   }
 
   const buildQueue = (extraNew) => buildQueueFor(ACTIVE, S.progress, S.settings.newPerDay, SESSION_MAX, extraNew);
-  // длина новых предложений по уровню: короткие на лёгком, длинные на сложном
+  // Каждое предложение размечено уровнем (1–3) и грамматической темой;
+  // тренировка берёт только предложения выбранного уровня и темы
   const SENT_LEVELS = {
-    easy: { label: 'Лёгкий', min: 3, max: 6 },
-    medium: { label: 'Средний', min: 3, max: 9 },
-    hard: { label: 'Сложный', min: 5, max: 12 },
+    easy: { label: 'Лёгкий', n: 1 },
+    medium: { label: 'Средний', n: 2 },
+    hard: { label: 'Сложный', n: 3 },
   };
+  const LEVEL_BY_N = { 1: 'easy', 2: 'medium', 3: 'hard' };
   const sentLevel = () => SENT_LEVELS[S.settings.sentLevel] ? S.settings.sentLevel : 'medium';
-  function fitsLevel(s) {
-    const L = SENT_LEVELS[sentLevel()];
-    const n = AzGrammar.tokens(s.az).length;
-    return n >= L.min && n <= L.max;
+  const sentTopic = () => AzGrammar.TOPICS[S.settings.sentTopic] ? S.settings.sentTopic : 'all';
+  function sentPool(level, topic) {
+    const n = SENT_LEVELS[level || sentLevel()].n;
+    const tp = topic || sentTopic();
+    return SACTIVE.filter((s) => s.level === n && (tp === 'all' || s.topic === tp));
   }
-  const buildSentQueue = (extraNew) => buildQueueFor(SACTIVE, S.sprogress, S.settings.sentPerDay, SENT_SESSION_MAX, extraNew, fitsLevel);
+  // при «Все темы» новые предложения чередуются по темам, чтобы сессия не была на одно правило
+  function mixTopics(list) {
+    if (sentTopic() !== 'all') return list;
+    const groups = new Map();
+    for (const s of list) {
+      if (!groups.has(s.topic)) groups.set(s.topic, []);
+      groups.get(s.topic).push(s);
+    }
+    const queues = shuffle([...groups.values()]);
+    const out = [];
+    while (queues.some((g) => g.length)) for (const g of queues) if (g.length) out.push(g.shift());
+    return out;
+  }
+  const buildSentQueue = (extraNew) => buildQueueFor(sentPool(), S.sprogress, S.settings.sentPerDay, SENT_SESSION_MAX, extraNew, mixTopics);
 
   function buildHardQueue() {
     return ACTIVE
@@ -1003,18 +1034,20 @@
     }
     let sent = '';
     if (SACTIVE.length) {
+      const lvl = sentLevel();
       sent = `<section class="card hero sent-card">
         <div class="hero-title">Предложения <span class="muted">· соберите фразу из слов</span></div>
-        ${seg('sentLevel', sentLevel(), Object.entries(SENT_LEVELS).map(([k, v]) => [k, v.label]))}
+        ${seg('sentLevel', lvl, Object.entries(SENT_LEVELS).map(([k, v]) => [k, `${v.label} <span class="seg-n">${sentPool(k, 'all').length}</span>`]))}
         <p class="muted small level-hint">${{
-          easy: 'Короткие фразы, 2–3 лишних слова, видно число слов.',
-          medium: 'Лишних слов около половины, многие похожи на нужные.',
-          hard: 'Длинные фразы, лишних столько же, сколько нужных, все похожие. Порядок — только точный.',
-        }[sentLevel()]}</p>
+          easy: 'Простые фразы в одно действие, 2–3 лишних слова, видно число слов.',
+          medium: '«Нужно», «можно», просьбы, «ki». Лишних около половины, многие похожи.',
+          hard: 'Причастия, условия, деепричастия. Лишних столько же, сколько нужных. Порядок — только точный.',
+        }[lvl]}</p>
+        ${topicSelect(lvl)}
         ${sPlanned > 0
           ? `<div class="hero-line"><span><b>${sc.due}</b> ${plural(sc.due, 'повторение', 'повторения', 'повторений')}</span><span><b>${sc.newLeft}</b> ${plural(sc.newLeft, 'новое', 'новых', 'новых')}</span></div>
              <button class="btn primary big" data-act="start-sent">Собрать предложения</button>`
-          : `<p class="muted">На сегодня всё.</p>
+          : `<p class="muted">${sc.total ? 'На сегодня всё.' : 'В этой теме на этом уровне предложений нет.'}</p>
              ${sc.fresh ? '<div class="row"><button class="btn" data-act="more-sent">Ещё 5 предложений</button></div>' : ''}`}
       </section>`;
     }
@@ -1154,7 +1187,8 @@
       <div class="quiz">
         ${quizTop()}
         <div class="prompt sent-prompt">
-          <div class="label">Соберите по-азербайджански <em class="chip lvl-${q.level}">${SENT_LEVELS[q.level].label.toLowerCase()}</em>${q.isNew ? ' <em class="chip new">новое</em>' : ''}</div>
+          <div class="label">Соберите по-азербайджански</div>
+          <div class="label chips-line"><em class="chip lvl-${q.level}">${SENT_LEVELS[q.level].label.toLowerCase()}</em> <em class="chip topic">${esc(AzGrammar.TOPICS[sent.topic] || '')}</em>${q.isNew ? ' <em class="chip new">новое</em>' : ''}</div>
           <div class="word sent">${esc(sent.ru)}</div>
         </div>
         <div class="answer-zone ${result ? (result.ok ? 'ok' : 'bad') : ''}">${answerTiles || '<span class="placeholder muted">Нажимайте на слова по порядку</span>'}</div>
@@ -1209,8 +1243,10 @@
         if (!isSent && !S.settings.includeEn && c.lang === 'en') return false;
         if (!S.settings.includePdf && c.origin === 'pdf') return false;
         if (f === 'edited') { if (isSent || !c.edited) return false; }
+        else if (/^l[123]$/.test(f)) { if (c.level !== +f[1]) return false; }
         else if (f !== 'all' && statusOf(c, store) !== f) return false;
       }
+      if (isSent && wordsUi.topic && wordsUi.topic !== 'all' && c.topic !== wordsUi.topic) return false;
       if (fq) {
         const hay = isSent ? [c.az, c.ru] : [c.az, c.gloss].concat(c.alts);
         if (!hay.some((h) => fold(h).includes(fq))) return false;
@@ -1227,7 +1263,8 @@
       const p = store[c.id];
       const dueTxt = p ? (p.d <= t ? 'сегодня' : `через ${p.d - t} дн.`) : '';
       const main = isSent
-        ? `<b lang="az">${esc(c.az)}</b><span>${esc(c.ru)}</span>`
+        ? `<b lang="az">${esc(c.az)}</b><span>${esc(c.ru)}</span>
+           <span class="tags"><em class="chip lvl-${LEVEL_BY_N[c.level]}">${SENT_LEVELS[LEVEL_BY_N[c.level]].label.toLowerCase()}</em> <em class="chip topic">${esc(AzGrammar.TOPICS[c.topic] || '')}</em></span>`
         : `<b lang="az">${esc(c.az)}</b><span>${esc(c.gloss)}${c.lang === 'en' ? ' <em class="chip">EN</em>' : ''}${c.origin === 'pdf' ? ' <em class="chip">PDF</em>' : ''}${c.edited ? ' <em class="chip new">исправлено</em>' : ''}</span>`;
       return `<li class="w ${st} ${isSent ? 'sentence' : ''}" ${isSent ? '' : `data-act="card" data-id="${c.id}"`}>
         <i class="st"></i>
@@ -1245,7 +1282,11 @@
       <div class="search">
         <input type="search" id="wq" placeholder="${isSent ? 'Поиск по предложениям…' : 'Поиск: söz, слово…'}" value="${esc(wordsUi.query)}" autocomplete="off" autocapitalize="off" spellcheck="false">
       </div>
-      <div class="chips">${chip('all', 'Все')}${chip('new', 'Новые')}${chip('learning', 'Изучаю')}${chip('learned', 'Выучено')}${isSent ? '' : chip('edited', 'Исправленные')}${chip('hidden', 'Скрытые')}</div>
+      <div class="chips">${isSent
+        ? chip('all', 'Все') + chip('l1', 'Лёгкие') + chip('l2', 'Средние') + chip('l3', 'Сложные') + chip('hidden', 'Скрытые')
+        : chip('all', 'Все') + chip('new', 'Новые') + chip('learning', 'Изучаю') + chip('learned', 'Выучено') + chip('edited', 'Исправленные') + chip('hidden', 'Скрытые')}</div>
+      ${isSent ? `<div class="list-topic">${topicSelect(null, 'wtopic')}</div>` : ''}
+      ${isSent ? `<p class="muted small list-count">Показано: ${total}</p>` : ''}
       <ul class="wlist">${rows || '<li class="empty muted">Ничего не найдено</li>'}</ul>
       ${total > shown.length ? `<button class="btn wide" data-act="wmore">Показать ещё (${total - shown.length})</button>` : ''}
       <p class="hint muted">${isSent
@@ -1262,6 +1303,19 @@
       again.focus();
       try { again.setSelectionRange(pos, pos); } catch (e) { /* type=search в некоторых браузерах */ }
     });
+  }
+
+  // выбор грамматической темы; в списке — темы, которые есть на этом уровне, с количеством
+  function topicSelect(level, act) {
+    const pool = level ? sentPool(level, 'all') : SACTIVE;
+    const cnt = {};
+    for (const s of pool) cnt[s.topic] = (cnt[s.topic] || 0) + 1;
+    const cur = act === 'wtopic' ? wordsUi.topic || 'all' : sentTopic();
+    const opts = [`<option value="all">Все темы (${pool.length})</option>`].concat(
+      Object.entries(AzGrammar.TOPICS)
+        .filter(([k]) => cnt[k] || k === cur)
+        .map(([k, label]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(label)} (${cnt[k] || 0})</option>`));
+    return `<label class="topic-pick"><span>Тема</span><select data-act="${act || 'set-topic'}">${opts.join('')}</select></label>`;
   }
 
   function seg(name, value, options) {
@@ -1422,7 +1476,7 @@
       refreshActive();
       render();
     },
-    wtab(el) { wordsUi = { tab: el.dataset.tab, query: '', filter: 'all', limit: 150 }; render(); },
+    wtab(el) { wordsUi = { tab: el.dataset.tab, query: '', filter: 'all', topic: 'all', limit: 150 }; render(); },
     wfilter(el) { wordsUi.filter = el.dataset.f; wordsUi.limit = 150; render(); },
     wmore() { wordsUi.limit += 300; render(); },
     set(el) {
@@ -1476,6 +1530,17 @@
   $app.addEventListener('change', (e) => {
     const el = e.target;
     if (el.matches('input[type=checkbox][data-act]')) ACTIONS[el.dataset.act](el, e);
+    if (el.matches('select[data-act="set-topic"]')) {
+      S.settings.sentTopic = el.value;
+      save();
+      render();
+      updateBadge();
+    }
+    if (el.matches('select[data-act="wtopic"]')) {
+      wordsUi.topic = el.value;
+      wordsUi.limit = 150;
+      render();
+    }
   });
 
   $sheet.addEventListener('click', (e) => {
@@ -1540,7 +1605,7 @@
   (async function boot() {
     rebuild();
     render();
-    await Promise.all([loadPdf(), loadFixes(), loadExamples()]);
+    await Promise.all([loadPdf(), loadFixes(), loadExamples(), loadMeta()]);
     rebuild();
     if (docText) {
       const added = markKnown();
