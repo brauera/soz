@@ -32,6 +32,7 @@
         docId: DEFAULT_DOC_ID,
         newPerDay: 10,
         sentPerDay: 5,
+        sentLevel: 'medium',
         dailyGoal: 20,
         direction: 'auto',
         includeEn: true,
@@ -68,6 +69,9 @@
   let docText = null;
   let pdfText = null;
   let FIXES = null;
+  // готовые примеры для слов, которых нет в предложениях конспекта: az → [пример, перевод, форма слова]
+  const EXAMPLES_URL = 'data/examples.json';
+  let EXAMPLES = null;
   try { docText = localStorage.getItem(KEY_DOC); } catch (e) { /* нет доступа */ }
 
   function save() {
@@ -145,6 +149,8 @@
     SENTS = [...sents.values()];
     sById = new Map(SENTS.map((s) => [s.id, s]));
     LEX = AzGrammar.buildLexicon(SENTS, ALL);
+    EX_INDEX = null;
+    exCache.clear();
     refreshActive();
   }
 
@@ -331,6 +337,13 @@
     } catch (e) { /* без PDF работаем только с документом */ }
   }
 
+  async function loadExamples() {
+    try {
+      const res = await fetch(EXAMPLES_URL);
+      if (res.ok) EXAMPLES = await res.json();
+    } catch (e) { /* примеры будут только из конспекта */ }
+  }
+
   async function loadFixes() {
     try {
       const res = await fetch(FIXES_URL);
@@ -390,13 +403,15 @@
     return list.slice().sort((a, b) => (S.discovered[b.id] || 0) - (S.discovered[a.id] || 0) || b.line - a.line);
   }
 
-  function buildQueueFor(list, store, perDay, max, extraNew) {
+  function buildQueueFor(list, store, perDay, max, extraNew, freshFilter) {
     const t = today();
     const due = list
       .filter((c) => { const p = store[c.id]; return p && p.d <= t; })
       .sort((a, b) => store[a.id].d - store[b.id].d || store[a.id].b - store[b.id].b);
     const quota = extraNew != null ? extraNew : Math.max(0, perDay - newToday(store));
-    const fresh = orderNew(list.filter((c) => !store[c.id])).slice(0, quota);
+    const unseen = orderNew(list.filter((c) => !store[c.id]));
+    // сначала подходящие по фильтру (например, по длине предложения), потом остальные
+    const fresh = (freshFilter ? unseen.filter(freshFilter).concat(unseen.filter((c) => !freshFilter(c))) : unseen).slice(0, quota);
     const reviews = due.slice(0, Math.max(Math.ceil(max / 4), max - fresh.length));
     // новые равномерно между повторениями
     const out = [];
@@ -411,7 +426,19 @@
   }
 
   const buildQueue = (extraNew) => buildQueueFor(ACTIVE, S.progress, S.settings.newPerDay, SESSION_MAX, extraNew);
-  const buildSentQueue = (extraNew) => buildQueueFor(SACTIVE, S.sprogress, S.settings.sentPerDay, SENT_SESSION_MAX, extraNew);
+  // длина новых предложений по уровню: короткие на лёгком, длинные на сложном
+  const SENT_LEVELS = {
+    easy: { label: 'Лёгкий', min: 3, max: 6 },
+    medium: { label: 'Средний', min: 3, max: 9 },
+    hard: { label: 'Сложный', min: 5, max: 12 },
+  };
+  const sentLevel = () => SENT_LEVELS[S.settings.sentLevel] ? S.settings.sentLevel : 'medium';
+  function fitsLevel(s) {
+    const L = SENT_LEVELS[sentLevel()];
+    const n = AzGrammar.tokens(s.az).length;
+    return n >= L.min && n <= L.max;
+  }
+  const buildSentQueue = (extraNew) => buildQueueFor(SACTIVE, S.sprogress, S.settings.sentPerDay, SENT_SESSION_MAX, extraNew, fitsLevel);
 
   function buildHardQueue() {
     return ACTIVE
@@ -567,8 +594,8 @@
   function nextSentence() {
     const sent = sById.get(session.queue[session.idx]);
     const p = S.sprogress[sent.id];
-    const level = session.failed.has(sent.id) ? 0 : (p ? p.b : 0);
-    q = { kind: 'sent', sent, task: AzGrammar.makeTask(sent, level, LEX), chosen: [], result: null, isNew: !p };
+    const level = sentLevel();
+    q = { kind: 'sent', sent, level, task: AzGrammar.makeTask(sent, level, LEX), chosen: [], result: null, isNew: !p };
   }
 
   function addTile(id) {
@@ -587,7 +614,7 @@
     if (!q || q.kind !== 'sent' || q.result) return;
     if (!giveUp && !q.chosen.length) return;
     const keys = q.chosen.map((id) => q.task.tiles[id].key);
-    q.result = giveUp ? { ok: false, gaveUp: true } : AzGrammar.check(keys, q.task.answer);
+    q.result = giveUp ? { ok: false, gaveUp: true } : AzGrammar.check(keys, q.task.answer, q.level === 'hard');
     gradeItem(S.sprogress, q.sent.id, q.result.ok);
     if (!q.result.ok && navigator.vibrate) navigator.vibrate(60);
     render();
@@ -598,6 +625,90 @@
     const c = counts(), s = sentCounts();
     const n = c.due + c.newLeft + s.due + s.newLeft;
     (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
+  }
+
+  /* ---------- примеры употребления ---------- */
+
+  // окончания существительных: множественное число, принадлежность, падеж (qonşu → qonşularımızdan)
+  const NOUN_REST = /^(lar|lər)?(ım|im|um|üm|m|ın|in|un|ün|n|ı|i|u|ü|sı|si|su|sü|ımız|imiz|umuz|ümüz|mız|miz|muz|müz|ınız|iniz|unuz|ünüz|nız|niz|nuz|nüz|ları|ləri)?(n)?(da|də|dan|dən|a|ə|ya|yə|na|nə|ı|i|u|ü|nı|ni|nu|nü|ın|in|un|ün|nın|nin|nun|nün|la|lə|dır|dir|dur|dür)?$/;
+  // окончания глагола после основы (tələs → tələsir, tələsmə, tələsdi, tələsəcək…)
+  const VERB_REST = /^(y?[ıiuü]r|m[aə]|m[ıiuü]r|d[ıiuü]|t[ıiuü]|y?[aə]c[aə][kqğy]|[aə]r|y?[ıiuü]b|y?[aə]r[aə]k|y?[aə]n|d[ıiuü][kqğy]|m[ıiuü]ş|s[aə]|y?[ıiuü]n|y?[aə]k|y?[aə]q|y?[aə]$|y?[ıiuü]m|y?[ıiuü]z)/;
+  let EX_INDEX = null;
+  const exCache = new Map();
+
+  // слово → вычитанные предложения, где оно встречается
+  function exampleIndex() {
+    if (EX_INDEX) return EX_INDEX;
+    const byToken = new Map();
+    for (const s of SENTS) {
+      if (!s.checked || S.shidden[s.id]) continue;
+      for (const t of new Set(AzGrammar.tokens(s.az).map((x) => AzParser.azLower(x)))) {
+        if (!byToken.has(t)) byToken.set(t, []);
+        byToken.get(t).push(s);
+      }
+    }
+    EX_INDEX = { byToken, tokens: [...byToken.keys()] };
+    return EX_INDEX;
+  }
+
+  // форма слова в предложении: «tələsmək» → «tələsir», «qonşu» → «qonşumuz».
+  // Короткие слова — только целиком, чтобы «il» не находилось в «ilə».
+  function formMatches(t, w) {
+    if (t === w) return true;
+    if (/(maq|mək)$/.test(w)) {
+      const stem = w.slice(0, -3);
+      return stem.length >= 3 && t.startsWith(stem) && VERB_REST.test(t.slice(stem.length));
+    }
+    return w.length >= 4 && t.startsWith(w) && NOUN_REST.test(t.slice(w.length));
+  }
+
+  function sentenceExample(card) {
+    const idx = exampleIndex();
+    let best = null;
+    for (const alt of card.az.split(/\s*[\/=,;]\s*/)) {
+      const words = AzParser.azLower(alt.replace(/\([^)]*\)/g, '')).trim().split(/\s+/).filter(Boolean);
+      if (!words.length) continue;
+      const last = words[words.length - 1];
+      const head = words.slice(0, -1);
+      for (const t of idx.tokens) {
+        if (!formMatches(t, last)) continue;
+        for (const s of idx.byToken.get(t)) {
+          const toks = AzGrammar.tokens(s.az).map((x) => AzParser.azLower(x));
+          if (head.length) {
+            // во фразе «qəbul etmək» все слова, кроме последнего, должны стоять перед ним как есть
+            const i = toks.indexOf(t);
+            if (i < head.length || !head.every((w, j) => toks[i - head.length + j] === w)) continue;
+          }
+          const score = Math.abs(toks.length - 6) + (s.ru.length > 70 ? 3 : 0);
+          if (!best || score < best.score) best = { az: s.az, ru: s.ru, form: head.concat(t).join(' '), score };
+        }
+      }
+    }
+    return best;
+  }
+
+  /*
+   * Пример для слова:
+   *   1) проверенный пример из data/examples.json (предложение из конспекта или написанное заново);
+   *   2) для слов, появившихся позже, — вычитанное предложение конспекта с этим словом;
+   *   3) пример из той же строки конспекта, без перевода.
+   */
+  function exampleFor(card) {
+    if (exCache.has(card.id)) return exCache.get(card.id);
+    let ex = null;
+    const g = EXAMPLES ? EXAMPLES[card.az] : undefined;
+    if (Array.isArray(g)) ex = { az: g[0], ru: g[1], form: g[2] || '' };
+    else if (g === undefined) ex = sentenceExample(card);
+    if (!ex && card.examples.length) ex = { az: card.examples[0], ru: '', form: '' };
+    exCache.set(card.id, ex);
+    return ex;
+  }
+
+  function markForm(text, form) {
+    if (!form) return esc(text);
+    const at = AzParser.azLower(text).indexOf(AzParser.azLower(form));
+    if (at < 0) return esc(text);
+    return esc(text.slice(0, at)) + '<mark>' + esc(text.slice(at, at + form.length)) + '</mark>' + esc(text.slice(at + form.length));
   }
 
   /* ---------- поиск перевода в источниках ---------- */
@@ -894,6 +1005,12 @@
     if (SACTIVE.length) {
       sent = `<section class="card hero sent-card">
         <div class="hero-title">Предложения <span class="muted">· соберите фразу из слов</span></div>
+        ${seg('sentLevel', sentLevel(), Object.entries(SENT_LEVELS).map(([k, v]) => [k, v.label]))}
+        <p class="muted small level-hint">${{
+          easy: 'Короткие фразы, 2–3 лишних слова, видно число слов.',
+          medium: 'Лишних слов около половины, многие похожи на нужные.',
+          hard: 'Длинные фразы, лишних столько же, сколько нужных, все похожие. Порядок — только точный.',
+        }[sentLevel()]}</p>
         ${sPlanned > 0
           ? `<div class="hero-line"><span><b>${sc.due}</b> ${plural(sc.due, 'повторение', 'повторения', 'повторений')}</span><span><b>${sc.newLeft}</b> ${plural(sc.newLeft, 'новое', 'новых', 'новых')}</span></div>
              <button class="btn primary big" data-act="start-sent">Собрать предложения</button>`
@@ -968,7 +1085,11 @@
         <div class="fb-pair"><b lang="az">${esc(card.az)}</b> — ${esc(card.gloss)}${card.edited ? ' <em class="chip">исправлено</em>' : ''}</div>
         ${card.alts.length ? `<div class="fb-line"><span class="muted">ещё:</span> ${esc(card.alts.join(', '))}</div>` : ''}
         ${card.notes.length ? `<div class="fb-line"><span class="muted">заметка:</span> ${esc(card.notes.join('; '))}</div>` : ''}
-        ${card.examples.length ? `<div class="fb-ex" lang="az">${esc(card.examples[0])}</div>` : ''}
+        ${(() => {
+          const ex = exampleFor(card);
+          if (!ex) return '';
+          return `<div class="fb-ex"><div class="fb-ex-label">Пример</div><div lang="az">${markForm(ex.az, ex.form || card.az)}</div>${ex.ru ? `<div class="fb-ex-ru">${esc(ex.ru)}</div>` : ''}</div>`;
+        })()}
         ${wrongPick ? `<div class="fb-line wrong-pick"><span class="muted">вы выбрали:</span> <b lang="az">${esc(wrongPick.az)}</b> — ${esc(wrongPick.gloss)}</div>` : ''}
         <div class="fb-actions">
           <button class="link" data-act="fix" title="Найти правильный перевод в конспекте">Неверный перевод?</button>
@@ -1003,6 +1124,10 @@
       }).join('');
     } else {
       answerTiles = chosen.map((id, i) => `<button class="tile" data-act="untile" data-pos="${i}" lang="az">${esc(task.tiles[id].text)}</button>`).join('');
+      // на лёгком уровне видно, сколько слов в предложении
+      if (q.level === 'easy') {
+        for (let i = chosen.length; i < task.answer.length; i++) answerTiles += '<span class="slot" aria-hidden="true"></span>';
+      }
     }
     const bank = task.tiles.map((t) => chosenSet.has(t.id)
       ? `<span class="tile ghost" aria-hidden="true">${esc(t.text)}</span>`
@@ -1029,7 +1154,7 @@
       <div class="quiz">
         ${quizTop()}
         <div class="prompt sent-prompt">
-          <div class="label">Соберите по-азербайджански${q.isNew ? ' <em class="chip new">новое</em>' : ''}</div>
+          <div class="label">Соберите по-азербайджански <em class="chip lvl-${q.level}">${SENT_LEVELS[q.level].label.toLowerCase()}</em>${q.isNew ? ' <em class="chip new">новое</em>' : ''}</div>
           <div class="word sent">${esc(sent.ru)}</div>
         </div>
         <div class="answer-zone ${result ? (result.ok ? 'ok' : 'bad') : ''}">${answerTiles || '<span class="placeholder muted">Нажимайте на слова по порядку</span>'}</div>
@@ -1163,6 +1288,7 @@
       <section class="card form">
         <div class="field"><span>Новых слов в день</span>${seg('newPerDay', s.newPerDay, [[5, '5'], [10, '10'], [15, '15'], [20, '20'], [30, '30']])}</div>
         <div class="field"><span>Новых предложений в день</span>${seg('sentPerDay', s.sentPerDay, [[3, '3'], [5, '5'], [8, '8'], [10, '10']])}</div>
+        <div class="field"><span>Сложность предложений</span>${seg('sentLevel', sentLevel(), Object.entries(SENT_LEVELS).map(([k, v]) => [k, v.label]))}</div>
         <div class="field"><span>Цель на день (ответов)</span>${seg('dailyGoal', s.dailyGoal, [[10, '10'], [20, '20'], [30, '30'], [50, '50']])}</div>
         <div class="field"><span>Направление</span>${seg('direction', s.direction, [['auto', 'Авто'], ['az', 'AZ→RU'], ['ru', 'RU→AZ'], ['mix', 'Микс']])}
           <small class="muted">«Авто»: новые слова — с азербайджанского, выученные — чаще в обратную сторону.</small></div>
@@ -1414,7 +1540,7 @@
   (async function boot() {
     rebuild();
     render();
-    await Promise.all([loadPdf(), loadFixes()]);
+    await Promise.all([loadPdf(), loadFixes(), loadExamples()]);
     rebuild();
     if (docText) {
       const added = markKnown();
@@ -1433,6 +1559,7 @@
     get state() { return S; },
     get lex() { return LEX; },
     distractors: pickDistractors,
+    example: (c) => exampleFor(c),
     search: (az, lang) => searchSources(ALL.find((c) => c.az === az && (!lang || c.lang === lang))),
   };
 })();

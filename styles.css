@@ -615,3 +615,24 @@ body.sheet-open { overflow: hidden; }
 .hit-src { font-size: 12px; margin-bottom: 2px; }
 .hit-text { font-size: 15px; overflow-wrap: anywhere; }
 mark { background: color-mix(in srgb, var(--flame) 30%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+/* ---------- уровни сложности и примеры ---------- */
+
+.sent-card .seg { margin-bottom: 8px; }
+.level-hint { margin: 0 0 14px; min-height: 2.8em; }
+.slot {
+  display: inline-block;
+  width: 64px;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1.5px dashed var(--line);
+  background: var(--surface-2);
+}
+.chip.lvl-easy { background: var(--good-soft); color: var(--good); }
+.chip.lvl-medium { background: var(--accent-soft); color: var(--accent); }
+.chip.lvl-hard { background: var(--bad-soft); color: var(--bad); }
+
+.fb-ex { font-style: normal; }
+.fb-ex-label { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.fb-ex [lang="az"] { font-size: 16px; }
+.fb-ex-ru { color: var(--muted); font-size: 14px; margin-top: 3px; }

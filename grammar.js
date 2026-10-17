@@ -295,11 +295,23 @@
       .slice(0, 6);
   }
 
+  const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+
   /*
-   * Средняя сложность по умолчанию: лишних слов примерно половина от длины предложения,
-   * у выученных предложений — больше и похожее.
+   * Уровни сложности:
+   *   easy   — 2–3 лишних слова, непохожих на нужные (легко отсеять)
+   *   medium — около 60% от длины предложения, больше половины из них похожие формы
+   *   hard   — столько же лишних, сколько нужных (5–8), и все похожие: другие лица,
+   *            времена, падежи и однокоренные слова
    */
-  function makeTask(sentence, level, lex) {
+  const LEVELS = {
+    easy: { ratio: 0.35, min: 2, max: 3, similar: 0 },
+    medium: { ratio: 0.6, min: 3, max: 5, similar: 0.6 },
+    hard: { ratio: 1, min: 5, max: 8, similar: 1 },
+  };
+
+  function makeTask(sentence, difficulty, lex) {
+    const cfg = LEVELS[difficulty] || LEVELS.medium;
     const answer = tokens(sentence.az);
     const lower = answer.map((t) => azLower(t));
     const display = answer.map((t, i) => {
@@ -309,9 +321,8 @@
     });
     const answerSet = new Set(lower);
     const n = answer.length;
-    const need = level <= 1
-      ? Math.min(5, Math.max(3, Math.round(n * 0.5)))
-      : Math.min(7, Math.max(4, Math.round(n * 0.7)));
+    const need = clamp(Math.round(n * cfg.ratio), cfg.min, cfg.max);
+    const needSimilar = Math.ceil(need * cfg.similar);
 
     const extra = [];
     const used = new Set(lower);
@@ -322,11 +333,11 @@
       return true;
     };
 
-    // сначала по одной похожей форме на каждое слово, начиная с длинных (там окончания)
+    // похожие формы: по одной на слово, начиная с длинных (там окончания); на «сложном» — до двух
     const order = shuffle(lower.map((w, i) => i)).sort((a, b) => lower[b].length - lower[a].length);
-    for (let pass = 0; pass < 2 && extra.length < need; pass++) {
+    for (let pass = 0; pass < 2 && extra.length < needSimilar; pass++) {
       for (const i of order) {
-        if (extra.length >= need) break;
+        if (extra.length >= needSimilar) break;
         const w = lower[i];
         if (w.length < 2) continue;
         const real = shuffle([...pronounVariants(w), ...neighbors(w, lex)]);
@@ -336,10 +347,12 @@
         for (const v of pool) if (!answerSet.has(v) && take(v)) break;
       }
     }
-    // если похожих не хватило — случайные слова похожей длины
+    // остальное — случайные слова похожей длины, не начинающиеся как нужные
+    const prefixes = new Set(lower.map((w) => w.slice(0, 3)));
     let guard = 0;
-    while (extra.length < need && lex.list.length && guard++ < 200) {
+    while (extra.length < need && lex.list.length && guard++ < 400) {
       const w = lex.list[Math.floor(Math.random() * lex.list.length)];
+      if (prefixes.has(w.slice(0, 3)) && guard < 300) continue;
       if (Math.abs(w.length - (lower[guard % n] || '').length) <= 3) take(w);
     }
 
@@ -350,12 +363,14 @@
   }
 
   // Совпадает ли собранная последовательность с ответом. Порядок слов в азербайджанском
-  // довольно гибкий: небольшая перестановка (глагол остаётся в конце) засчитывается с пометкой.
-  function check(chosenKeys, answer) {
+  // довольно гибкий: небольшая перестановка (глагол остаётся в конце) засчитывается с пометкой,
+  // кроме уровня «сложный» (strict), где нужен точный порядок.
+  function check(chosenKeys, answer, strict) {
     const a = chosenKeys.join(' '), b = answer.join(' ');
     if (a === b) return { ok: true, exact: true };
     const sa = chosenKeys.slice().sort().join(' '), sb = answer.slice().sort().join(' ');
     if (sa !== sb) return { ok: false, exact: false };
+    if (strict) return { ok: false, exact: false, order: true };
     const n = answer.length;
     const moved = answer.filter((w, i) => chosenKeys[i] !== w).length;
     if (chosenKeys[n - 1] === answer[n - 1] && moved <= 2) return { ok: true, exact: false };
