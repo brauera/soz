@@ -265,11 +265,20 @@
    */
   function buildLexicon(sentences, cards) {
     const set = new Set();
-    // имена собственные: слова, которые пишутся с большой буквы и в середине предложения
+    // имена собственные: с большой буквы в середине предложения и ни разу со строчной
+    // («Mən» после точки внутри строки — не имя)
     const proper = new Set();
+    const lowerSeen = new Set();
     for (const s of sentences) {
-      tokens(s.az).forEach((t, i) => { if (i > 0 && /^[A-ZƏĞİÖÜŞÇ]/.test(t)) proper.add(azLower(t)); });
+      const raw = s.az.split(/\s+/);
+      tokens(s.az).forEach((t, i) => {
+        if (/^[a-zəğıöüşç]/.test(t)) lowerSeen.add(t);
+        else if (i > 0 && !/[.!?]$/.test(raw[i - 1] || '')) proper.add(azLower(t));
+      });
     }
+    for (const w of lowerSeen) proper.delete(w);
+    // основы имён: «Bakıda», «Bakıya» → «bakı», чтобы узнать «Bakı» и в начале фразы
+    const properStems = new Set([...proper].map((p) => p.slice(0, Math.max(4, p.length - 3))));
     // только вычитанные предложения: опечатки из конспекта не должны попадать в варианты
     const checked = sentences.filter((s) => s.checked);
     for (const s of checked.length ? checked : sentences) for (const t of tokens(s.az)) set.add(azLower(t));
@@ -283,7 +292,7 @@
       if (!byPrefix.has(k)) byPrefix.set(k, []);
       byPrefix.get(k).push(w);
     }
-    return { set, list, byPrefix, proper };
+    return { set, list, byPrefix, proper, properStems };
   }
 
   function neighbors(w, lex) {
@@ -314,9 +323,14 @@
     const cfg = LEVELS[difficulty] || LEVELS.medium;
     const answer = tokens(sentence.az);
     const lower = answer.map((t) => azLower(t));
+    const isProper = (w) => {
+      if (lex.proper.has(w)) return true;
+      for (let k = 4; k <= w.length; k++) if (lex.properStems && lex.properStems.has(w.slice(0, k))) return true;
+      return false;
+    };
     const display = answer.map((t, i) => {
-      // первое слово показываем строчными, если это не имя собственное
-      if (i === 0 && !lex.proper.has(azLower(t))) return azLower(t);
+      // первое слово показываем строчными (иначе заглавная выдаёт начало фразы), кроме имён
+      if (i === 0 && !isProper(azLower(t))) return azLower(t);
       return t;
     });
     const answerSet = new Set(lower);

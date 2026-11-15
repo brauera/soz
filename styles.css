@@ -661,3 +661,28 @@ mark { background: color-mix(in srgb, var(--flame) 30%, transparent); color: inh
 .chips-line { margin-top: -4px; }
 .chip.topic { text-transform: none; letter-spacing: 0; font-size: 11px; }
 .w-main .tags .chip.topic { font-size: 11px; }
+
+/* ---------- тренировка дня: план и перетаскивание плиток ---------- */
+
+.plan { margin: -4px 0 14px; padding-left: 18px; }
+.plan li { margin: 2px 0; }
+.quiz .tile[data-drag] { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.drag-hint { text-align: center; margin: 14px 0 0; }
+.tile-ph {
+  display: inline-block;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 2px dashed var(--accent);
+  background: var(--accent-soft);
+}
+.tile.drag-src { opacity: .3; }
+.drag-ghost {
+  position: fixed;
+  z-index: 70;
+  margin: 0;
+  pointer-events: none;
+  transform: scale(1.06) rotate(-1.5deg);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 22%);
+  border-color: var(--accent);
+}
+body.dragging { cursor: grabbing; user-select: none; -webkit-user-select: none; }

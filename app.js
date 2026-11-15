@@ -11,8 +11,6 @@
   const INTERVALS = [0, 1, 2, 4, 7, 14, 30, 60, 120];
   const LEARNED_BOX = 4;
   const MAX_BOX = INTERVALS.length - 1;
-  const SESSION_MAX = 40;
-  const SENT_SESSION_MAX = 15;
   const AUTO_SYNC_MS = 3 * 3600 * 1000;
 
   const $app = document.getElementById('app');
@@ -31,9 +29,6 @@
       settings: {
         docId: DEFAULT_DOC_ID,
         newPerDay: 10,
-        sentPerDay: 5,
-        sentLevel: 'medium',
-        sentTopic: 'all',
         dailyGoal: 20,
         direction: 'auto',
         includeEn: true,
@@ -42,7 +37,9 @@
         autoSync: true,
       },
       progress: {},   // слово id → { b: коробка, d: день повтора, s: показов, c: верно, w: ошибок, f: день знакомства, l: последний день }
-      sprogress: {},  // предложение id → то же самое
+      sprogress: {},  // предложения из уроков (раньше была отдельная тренировка)
+      exSeen: {},     // id слова → день, когда последний раз собрана фраза-пример
+      exHidden: {},   // id слова → пример с ошибкой, не давать собирать
       hidden: {},     // скрытые слова
       shidden: {},    // скрытые предложения
       overrides: {},  // id слова → исправленный перевод
@@ -155,7 +152,9 @@
     }
     SENTS = [...sents.values()];
     sById = new Map(SENTS.map((s) => [s.id, s]));
-    LEX = AzGrammar.buildLexicon(SENTS, ALL);
+    // примеры к словам вычитаны — их слова тоже идут в словарь лишних плиток и имён собственных
+    const exSents = EXAMPLES ? Object.values(EXAMPLES).filter(Array.isArray).map((g) => ({ az: g[0], checked: true })) : [];
+    LEX = AzGrammar.buildLexicon(SENTS.concat(exSents), ALL);
     EX_INDEX = null;
     exCache.clear();
     refreshActive();
@@ -221,7 +220,6 @@
   }
 
   const counts = () => countsFor(ACTIVE, S.progress, S.settings.newPerDay);
-  const sentCounts = () => countsFor(sentPool(), S.sprogress, S.settings.sentPerDay);
 
   function dayStat(d) { return S.days[d] || { a: 0, c: 0 }; }
 
@@ -405,12 +403,25 @@
     }
   }
 
-  /* ---------- общая логика повторения ---------- */
+  /* ---------- тренировка ---------- */
 
   let view = 'home';
   let session = null;
   let q = null;
   let wordsUi = { tab: 'words', query: '', filter: 'all', topic: 'all', limit: 150 };
+
+  // в одной тренировке: до 24 слов и примерно каждое четвёртое — сборка примера (не больше 6)
+  const WORDS_PER_SESSION = 24;
+  const SENT_EVERY = 4;
+  const SENT_MAX = 6;
+
+  // уровни предложений из уроков — только для справочного списка в разделе «Слова»
+  const SENT_LEVELS = {
+    easy: { label: 'Лёгкий', n: 1 },
+    medium: { label: 'Средний', n: 2 },
+    hard: { label: 'Сложный', n: 3 },
+  };
+  const LEVEL_BY_N = { 1: 'easy', 2: 'medium', 3: 'hard' };
 
   function orderNew(list) {
     const o = S.settings.order;
@@ -419,16 +430,16 @@
     return list.slice().sort((a, b) => (S.discovered[b.id] || 0) - (S.discovered[a.id] || 0) || b.line - a.line);
   }
 
-  function buildQueueFor(list, store, perDay, max, extraNew, arrange) {
+  // повторения по сроку и новые слова, новые — равномерно между повторениями
+  function buildWordQueue(extraNew, max) {
     const t = today();
-    const due = list
+    const store = S.progress;
+    const due = ACTIVE
       .filter((c) => { const p = store[c.id]; return p && p.d <= t; })
       .sort((a, b) => store[a.id].d - store[b.id].d || store[a.id].b - store[b.id].b);
-    const quota = extraNew != null ? extraNew : Math.max(0, perDay - newToday(store, list));
-    const unseen = orderNew(list.filter((c) => !store[c.id]));
-    const fresh = (arrange ? arrange(unseen) : unseen).slice(0, quota);
-    const reviews = due.slice(0, Math.max(Math.ceil(max / 4), max - fresh.length));
-    // новые равномерно между повторениями
+    const quota = extraNew != null ? extraNew : Math.max(0, S.settings.newPerDay - newToday(store, ACTIVE));
+    const fresh = orderNew(ACTIVE.filter((c) => !store[c.id])).slice(0, Math.min(quota, max));
+    const reviews = due.slice(0, Math.max(0, max - fresh.length));
     const out = [];
     const step = fresh.length ? Math.max(1, Math.floor(reviews.length / fresh.length)) : 0;
     let ri = 0;
@@ -440,36 +451,49 @@
     return out;
   }
 
-  const buildQueue = (extraNew) => buildQueueFor(ACTIVE, S.progress, S.settings.newPerDay, SESSION_MAX, extraNew);
-  // Каждое предложение размечено уровнем (1–3) и грамматической темой;
-  // тренировка берёт только предложения выбранного уровня и темы
-  const SENT_LEVELS = {
-    easy: { label: 'Лёгкий', n: 1 },
-    medium: { label: 'Средний', n: 2 },
-    hard: { label: 'Сложный', n: 3 },
-  };
-  const LEVEL_BY_N = { 1: 'easy', 2: 'medium', 3: 'hard' };
-  const sentLevel = () => SENT_LEVELS[S.settings.sentLevel] ? S.settings.sentLevel : 'medium';
-  const sentTopic = () => AzGrammar.TOPICS[S.settings.sentTopic] ? S.settings.sentTopic : 'all';
-  function sentPool(level, topic) {
-    const n = SENT_LEVELS[level || sentLevel()].n;
-    const tp = topic || sentTopic();
-    return SACTIVE.filter((s) => s.level === n && (tp === 'all' || s.topic === tp));
+  // пример к слову, из которого можно собрать фразу: с переводом и не длиннее 8 слов
+  function buildableExample(card) {
+    if (!card || S.exHidden[card.id]) return null;
+    const ex = exampleFor(card);
+    if (!ex || !ex.ru) return null;
+    const n = AzGrammar.tokens(ex.az).length;
+    return n >= 3 && n <= 8 ? ex : null;
   }
-  // при «Все темы» новые предложения чередуются по темам, чтобы сессия не была на одно правило
-  function mixTopics(list) {
-    if (sentTopic() !== 'all') return list;
-    const groups = new Map();
-    for (const s of list) {
-      if (!groups.has(s.topic)) groups.set(s.topic, []);
-      groups.get(s.topic).push(s);
+
+  /*
+   * Тренировка: слова в обе стороны, а примерно каждый четвёртый шаг — сборка примера
+   * к одному из слов этой же тренировки, через пару шагов после самого слова.
+   */
+  function buildSession(extraNew) {
+    const words = buildWordQueue(extraNew, WORDS_PER_SESSION);
+    const items = words.map((id) => ({ t: 'w', id }));
+    const t = today();
+    const cands = [];
+    words.forEach((id, i) => {
+      if (!buildableExample(byId.get(id))) return;
+      const recent = S.exSeen[id] != null && t - S.exSeen[id] < 3;
+      // сначала уже знакомые слова, недавно собранные — в последнюю очередь
+      cands.push({ id, i, score: (S.progress[id] ? 2 : 1) - (recent ? 3 : 0) + Math.random() });
+    });
+    const want = Math.min(SENT_MAX, Math.round(words.length / SENT_EVERY), cands.length);
+    const picked = [];
+    if (want > 0) {
+      // равномерно по тренировке: на каждом отрезке берём лучшего кандидата
+      const span = words.length / want;
+      for (let k = 0; k < want; k++) {
+        const best = cands
+          .filter((x) => x.i >= k * span && x.i < (k + 1) * span)
+          .sort((a, b) => b.score - a.score)[0];
+        if (best) picked.push(best);
+      }
     }
-    const queues = shuffle([...groups.values()]);
-    const out = [];
-    while (queues.some((g) => g.length)) for (const g of queues) if (g.length) out.push(g.shift());
-    return out;
+    // вставляем с конца, чтобы позиции раньше по очереди не сдвигались
+    picked.sort((a, b) => b.i - a.i).forEach((x) => {
+      const pos = Math.min(items.length, x.i + 3 + Math.floor(Math.random() * 2));
+      items.splice(pos, 0, { t: 's', id: x.id });
+    });
+    return items;
   }
-  const buildSentQueue = (extraNew) => buildQueueFor(sentPool(), S.sprogress, S.settings.sentPerDay, SENT_SESSION_MAX, extraNew, mixTopics);
 
   function buildHardQueue() {
     return ACTIVE
@@ -479,28 +503,40 @@
         return pb.w / pb.s - pa.w / pa.s || pb.w - pa.w;
       })
       .slice(0, 20)
-      .map((c) => c.id);
+      .map((c) => ({ t: 'w', id: c.id }));
   }
 
-  function startSession(queue, kind, mode) {
-    if (!queue.length) { toast(kind === 'sent' ? 'Нет предложений для тренировки' : 'Нет слов для тренировки'); return; }
-    session = { kind, queue, idx: 0, answered: 0, correct: 0, failed: new Set(), requeued: {}, newIds: new Set(), mode: mode || 'daily' };
+  function startSession(items, mode) {
+    if (!items.length) { toast('Нет слов для тренировки'); return; }
+    session = {
+      queue: items, idx: 0, answered: 0, correct: 0, sentences: 0,
+      failed: new Set(), requeued: {}, newIds: new Set(), mode: mode || 'daily',
+    };
     view = 'quiz';
     window.scrollTo(0, 0);
     nextQuestion();
   }
 
-  function gradeItem(store, id, ok) {
+  function countAnswer(ok) {
     const t = today();
-    let p = store[id];
+    const ds = S.days[t] || (S.days[t] = { a: 0, c: 0 });
+    ds.a++;
+    if (ok) ds.c++;
+    session.answered++;
+    if (ok) session.correct++;
+  }
+
+  function gradeWord(id, ok) {
+    const t = today();
+    let p = S.progress[id];
     const isNew = !p;
-    if (!p) p = store[id] = { b: 0, d: t, s: 0, c: 0, w: 0, f: t, l: t };
+    if (!p) p = S.progress[id] = { b: 0, d: t, s: 0, c: 0, w: 0, f: t, l: t };
     p.s++;
     p.l = t;
     if (ok) {
       p.c++;
       if (!session.failed.has(id)) {
-        // сразу справился с новым — скорее всего, уже знаком
+        // сразу угадал новое слово — скорее всего, уже знаком
         p.b = isNew ? 2 : Math.min(MAX_BOX, p.b + 1);
         p.d = t + INTERVALS[p.b];
       }
@@ -509,28 +545,30 @@
       p.b = p.b >= LEARNED_BOX ? 2 : 1;
       p.d = t + 1;
       session.failed.add(id);
-      // вернуть через несколько карточек, не больше двух раз за сессию
+      // вернуть через несколько шагов, не больше двух раз за тренировку
       const n = session.requeued[id] || 0;
       if (n < 2) {
         session.requeued[id] = n + 1;
         const pos = Math.min(session.queue.length, session.idx + 3 + Math.floor(Math.random() * 3));
-        session.queue.splice(pos, 0, id);
+        session.queue.splice(pos, 0, { t: 'w', id });
       }
     }
     if (isNew) session.newIds.add(id);
-    const ds = S.days[t] || (S.days[t] = { a: 0, c: 0 });
-    ds.a++;
-    if (ok) ds.c++;
-    session.answered++;
-    if (ok) session.correct++;
+    countAnswer(ok);
     save();
   }
 
+  function itemValid(it) {
+    const card = byId.get(it.id);
+    if (!card || S.hidden[card.id]) return false;
+    return it.t === 'w' || !!buildableExample(card);
+  }
+
   function nextQuestion() {
-    const lookup = session.kind === 'sent' ? sById : byId;
-    while (session.idx < session.queue.length && !lookup.get(session.queue[session.idx])) session.idx++;
+    while (session.idx < session.queue.length && !itemValid(session.queue[session.idx])) session.idx++;
     if (session.idx >= session.queue.length) { view = 'summary'; q = null; render(); return; }
-    if (session.kind === 'sent') nextSentence(); else nextWord();
+    const it = session.queue[session.idx];
+    if (it.t === 's') nextSentence(byId.get(it.id)); else nextWord(byId.get(it.id));
     render();
   }
 
@@ -544,20 +582,21 @@
 
   /* ---------- слова ---------- */
 
-  function chooseDir(level) {
+  // Новое слово и повтор после ошибки — с азербайджанского (узнать проще),
+  // остальные — в обе стороны поровну
+  function chooseDir(card, level) {
     const m = S.settings.direction;
     if (m === 'az') return 'fwd';
     if (m === 'ru') return 'rev';
     if (m === 'mix') return Math.random() < 0.5 ? 'fwd' : 'rev';
-    if (level <= 1) return 'fwd';
-    if (level <= 3) return Math.random() < 0.5 ? 'fwd' : 'rev';
-    return Math.random() < 0.7 ? 'rev' : 'fwd';
+    if (level === 0 || session.failed.has(card.id)) return 'fwd';
+    return Math.random() < 0.5 ? 'fwd' : 'rev';
   }
 
   /*
-   * Подбор неправильных вариантов. Кандидаты — того же языка, без пересечения по смыслу.
-   * Чем выше уровень слова, тем больше варианты похожи на правильный ответ:
-   * та же часть речи, похожая длина, общее окончание, близкое написание.
+   * Подбор неправильных вариантов: того же языка, без пересечения по смыслу,
+   * той же части речи и похожей длины. Похожие по написанию варианты появляются
+   * только у хорошо выученных слов, чтобы базовая тренировка оставалась простой.
    */
   function pickDistractors(card, dir, level) {
     const text = (c) => (dir === 'fwd' ? c.gloss : c.az);
@@ -565,7 +604,7 @@
     const tMean = new Set(card.meanings);
     const tLen = target.length, tWc = wc(target);
     const tLast = fold(target.split(/[\s,;\/]+/).filter(Boolean).pop() || target);
-    const hard = level >= 2;
+    const hard = level >= 5;
     const scored = [];
     for (const c of ACTIVE) {
       if (c.id === card.id || c.lang !== card.lang) continue;
@@ -576,15 +615,17 @@
       if (c.type === card.type) s += 3;
       if (wc(t) === tWc) s += 1;
       s += 1.5 * Math.min(t.length, tLen) / Math.max(t.length, tLen);
-      const last = fold(t.split(/[\s,;\/]+/).filter(Boolean).pop() || t);
-      const suf = Math.min(3, suffixLen(last, tLast));
-      if (suf >= 2) s += hard ? suf * 0.6 : 0.3;
-      if (hard) s += 2.5 * (1 - lev(fold(t), fold(target)) / Math.max(t.length, tLen));
-      s += Math.random() * (level <= 1 ? 2.5 : level <= 3 ? 1.2 : 0.5);
+      if (hard) {
+        const last = fold(t.split(/[\s,;\/]+/).filter(Boolean).pop() || t);
+        const suf = Math.min(3, suffixLen(last, tLast));
+        if (suf >= 2) s += suf * 0.5;
+        s += 2 * (1 - lev(fold(t), fold(target)) / Math.max(t.length, tLen));
+      }
+      s += Math.random() * (hard ? 1 : 2.5);
       scored.push({ c, s, t });
     }
     scored.sort((a, b) => b.s - a.s);
-    const window = level <= 1 ? 14 : level <= 3 ? 7 : 4;
+    const window = hard ? 8 : 14;
     const top = shuffle(scored.slice(0, window));
     const picked = [];
     const seen = new Set([target]);
@@ -597,11 +638,10 @@
     return picked;
   }
 
-  function nextWord() {
-    const card = byId.get(session.queue[session.idx]);
+  function nextWord(card) {
     const p = S.progress[card.id];
     const level = session.failed.has(card.id) ? 0 : (p ? p.b : 0);
-    const dir = chooseDir(level);
+    const dir = chooseDir(card, level);
     const options = shuffle([card].concat(pickDistractors(card, dir, level))).map((c) => ({ id: c.id, correct: c.id === card.id }));
     q = { kind: 'word', card, dir, options, picked: null, isNew: !p };
   }
@@ -615,23 +655,24 @@
     if (!q || q.kind !== 'word' || q.picked !== null) return;
     q.picked = i;
     const ok = i >= 0 && q.options[i].correct;
-    gradeItem(S.progress, q.card.id, ok);
+    gradeWord(q.card.id, ok);
     if (!ok && navigator.vibrate) navigator.vibrate(60);
     render();
   }
 
-  /* ---------- предложения ---------- */
+  /* ---------- сборка примера ---------- */
 
-  function nextSentence() {
-    const sent = sById.get(session.queue[session.idx]);
-    const p = S.sprogress[sent.id];
-    const level = sentLevel();
-    q = { kind: 'sent', sent, level, task: AzGrammar.makeTask(sent, level, LEX), chosen: [], result: null, isNew: !p };
+  // простой режим: 2–3 непохожих лишних слова и видно, сколько слов в предложении
+  function nextSentence(card) {
+    const ex = buildableExample(card);
+    const sent = { id: 'x' + card.id, az: ex.az, ru: ex.ru, form: ex.form };
+    q = { kind: 'sent', card, sent, task: AzGrammar.makeTask(sent, 'easy', LEX), chosen: [], result: null };
   }
 
-  function addTile(id) {
+  function addTile(id, at) {
     if (!q || q.kind !== 'sent' || q.result || q.chosen.includes(id)) return;
-    q.chosen.push(id);
+    if (at == null || at > q.chosen.length) q.chosen.push(id);
+    else q.chosen.splice(at, 0, id);
     render();
   }
 
@@ -641,20 +682,134 @@
     render();
   }
 
+  function moveTile(from, to) {
+    if (!q || q.kind !== 'sent' || q.result) return;
+    const [id] = q.chosen.splice(from, 1);
+    q.chosen.splice(Math.min(to, q.chosen.length), 0, id);
+    render();
+  }
+
   function checkSentence(giveUp) {
     if (!q || q.kind !== 'sent' || q.result) return;
     if (!giveUp && !q.chosen.length) return;
     const keys = q.chosen.map((id) => q.task.tiles[id].key);
-    q.result = giveUp ? { ok: false, gaveUp: true } : AzGrammar.check(keys, q.task.answer, q.level === 'hard');
-    gradeItem(S.sprogress, q.sent.id, q.result.ok);
+    q.result = giveUp ? { ok: false, gaveUp: true } : AzGrammar.check(keys, q.task.answer, false);
+    if (q.result.ok) S.exSeen[q.card.id] = today();
+    session.sentences++;
+    countAnswer(q.result.ok);
+    save();
     if (!q.result.ok && navigator.vibrate) navigator.vibrate(60);
     render();
   }
 
+  /*
+   * Перетаскивание плиток, как в Duolingo: плитку из ответа можно поставить в другое место
+   * или утащить обратно, плитку из запаса — вставить в нужное место ответа.
+   * Простое нажатие по-прежнему добавляет или убирает плитку.
+   */
+  let drag = null;
+  let dragEndedAt = 0;
+
+  function dragTiles(zone) {
+    return [...zone.querySelectorAll('.tile[data-drag="a"]')].filter((t) => !drag || t !== drag.el);
+  }
+
+  function startDrag(e) {
+    const el = drag.el;
+    const r = el.getBoundingClientRect();
+    const ghost = el.cloneNode(true);
+    ghost.classList.add('drag-ghost');
+    ghost.removeAttribute('data-act');
+    ghost.style.width = r.width + 'px';
+    ghost.style.height = r.height + 'px';
+    document.body.appendChild(ghost);
+    const ph = document.createElement('span');
+    ph.className = 'tile-ph';
+    ph.style.width = r.width + 'px';
+    drag.ghost = ghost;
+    drag.ph = ph;
+    drag.dx = drag.x0 - r.left;
+    drag.dy = drag.y0 - r.top;
+    drag.active = true;
+    drag.insertAt = null;
+    document.body.classList.add('dragging');
+    if (drag.from === 'a') {
+      // плитка из ответа: её место сразу занимает пустая ячейка
+      el.parentNode.insertBefore(ph, el);
+      el.style.display = 'none';
+      drag.insertAt = drag.pos;
+    } else {
+      el.classList.add('drag-src');
+    }
+    moveDrag(e);
+  }
+
+  function moveDrag(e) {
+    const { ghost, ph } = drag;
+    ghost.style.left = (e.clientX - drag.dx) + 'px';
+    ghost.style.top = (e.clientY - drag.dy) + 'px';
+    const zone = document.querySelector('.answer-zone');
+    if (!zone) return;
+    const zr = zone.getBoundingClientRect();
+    const inside = e.clientX > zr.left - 24 && e.clientX < zr.right + 24 && e.clientY > zr.top - 32 && e.clientY < zr.bottom + 24;
+    if (!inside) {
+      ph.remove();
+      drag.insertAt = null;
+      return;
+    }
+    const tiles = dragTiles(zone);
+    let at = tiles.length;
+    for (let i = 0; i < tiles.length; i++) {
+      const r = tiles[i].getBoundingClientRect();
+      if (e.clientY < r.top || (e.clientY <= r.bottom && e.clientX < r.left + r.width / 2)) { at = i; break; }
+    }
+    const before = tiles[at] || zone.querySelector('.slot');
+    if (before) zone.insertBefore(ph, before); else zone.appendChild(ph);
+    const hint = zone.querySelector('.placeholder');
+    if (hint) hint.remove();
+    drag.insertAt = at;
+  }
+
+  function finishDrag(apply) {
+    const d = drag;
+    drag = null;
+    document.body.classList.remove('dragging');
+    if (!d || !d.active) return;
+    d.ghost.remove();
+    dragEndedAt = Date.now();
+    if (!apply) { render(); return; }
+    if (d.from === 'a') {
+      if (d.insertAt == null) removeTile(d.pos);
+      else moveTile(d.pos, d.insertAt);
+    } else if (d.insertAt != null) {
+      addTile(d.id, d.insertAt);
+    } else {
+      render();
+    }
+  }
+
+  $app.addEventListener('pointerdown', (e) => {
+    const el = e.target.closest('.tile[data-drag]');
+    if (!el || !q || q.kind !== 'sent' || q.result || e.button > 0) return;
+    drag = { el, from: el.dataset.drag, pos: +el.dataset.pos, id: +el.dataset.id, x0: e.clientX, y0: e.clientY, pid: e.pointerId, active: false };
+  });
+  window.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.pid) return;
+    if (!drag.active) {
+      if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 8) return;
+      startDrag(e);
+      return;
+    }
+    e.preventDefault();
+    moveDrag(e);
+  }, { passive: false });
+  window.addEventListener('pointerup', (e) => { if (drag && e.pointerId === drag.pid) finishDrag(true); });
+  window.addEventListener('pointercancel', (e) => { if (drag && e.pointerId === drag.pid) finishDrag(false); });
+
   function updateBadge() {
     if (!('setAppBadge' in navigator)) return;
-    const c = counts(), s = sentCounts();
-    const n = c.due + c.newLeft + s.due + s.newLeft;
+    const c = counts();
+    const n = c.due + c.newLeft;
     (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
   }
 
@@ -1001,29 +1156,31 @@
 
   function renderHome() {
     const c = counts();
-    const sc = sentCounts();
     const st = streak();
     const td = dayStat(today());
     const goal = S.settings.dailyGoal;
     const pct = Math.min(100, Math.round((td.a / goal) * 100));
-    const planned = Math.min(c.due, SESSION_MAX) + c.newLeft;
-    const sPlanned = Math.min(sc.due, SENT_SESSION_MAX) + sc.newLeft;
+    const planned = Math.min(c.due, WORDS_PER_SESSION) + Math.min(c.newLeft, WORDS_PER_SESSION);
     let main;
     if (!ALL.length) {
       main = `<div class="card hero"><h2>Слов пока нет</h2><p class="muted">${syncError ? esc(syncError) : 'Загрузите документ, чтобы начать.'}</p>
         <button class="btn primary" data-act="sync">Загрузить из Google Docs</button></div>`;
     } else if (planned > 0) {
       main = `<div class="card hero">
-        <div class="hero-title">Слова</div>
+        <div class="hero-title">Тренировка дня</div>
         <div class="hero-nums">
           <div><b>${c.due}</b><span>${plural(c.due, 'повторение', 'повторения', 'повторений')}</span></div>
           <div><b>${c.newLeft}</b><span>${plural(c.newLeft, 'новое слово', 'новых слова', 'новых слов')}</span></div>
         </div>
+        <ul class="plan muted small">
+          <li>слова с азербайджанского на русский и обратно</li>
+          <li>сборка фраз из примеров к этим словам</li>
+        </ul>
         <button class="btn primary big" data-act="start">Начать тренировку</button>
       </div>`;
     } else {
       main = `<div class="card hero done">
-        <div class="hero-title">Слова</div>
+        <div class="hero-title">Тренировка дня</div>
         <h2>На сегодня всё</h2>
         <p class="muted">Все повторения сделаны. Следующие слова появятся завтра.</p>
         <div class="row">
@@ -1031,25 +1188,6 @@
           ${buildHardQueue().length ? '<button class="btn" data-act="hard">Трудные слова</button>' : ''}
         </div>
       </div>`;
-    }
-    let sent = '';
-    if (SACTIVE.length) {
-      const lvl = sentLevel();
-      sent = `<section class="card hero sent-card">
-        <div class="hero-title">Предложения <span class="muted">· соберите фразу из слов</span></div>
-        ${seg('sentLevel', lvl, Object.entries(SENT_LEVELS).map(([k, v]) => [k, `${v.label} <span class="seg-n">${sentPool(k, 'all').length}</span>`]))}
-        <p class="muted small level-hint">${{
-          easy: 'Простые фразы в одно действие, 2–3 лишних слова, видно число слов.',
-          medium: '«Нужно», «можно», просьбы, «ki». Лишних около половины, многие похожи.',
-          hard: 'Причастия, условия, деепричастия. Лишних столько же, сколько нужных. Порядок — только точный.',
-        }[lvl]}</p>
-        ${topicSelect(lvl)}
-        ${sPlanned > 0
-          ? `<div class="hero-line"><span><b>${sc.due}</b> ${plural(sc.due, 'повторение', 'повторения', 'повторений')}</span><span><b>${sc.newLeft}</b> ${plural(sc.newLeft, 'новое', 'новых', 'новых')}</span></div>
-             <button class="btn primary big" data-act="start-sent">Собрать предложения</button>`
-          : `<p class="muted">${sc.total ? 'На сегодня всё.' : 'В этой теме на этом уровне предложений нет.'}</p>
-             ${sc.fresh ? '<div class="row"><button class="btn" data-act="more-sent">Ещё 5 предложений</button></div>' : ''}`}
-      </section>`;
     }
     $app.innerHTML = `
       <header class="top">
@@ -1062,7 +1200,6 @@
         <div class="week">${weekDots()}</div>
       </section>
       ${main}
-      ${sent}
       <section class="stats">
         <div><b>${c.learned}</b><span>выучено</span></div>
         <div><b>${c.learning}</b><span>изучаю</span></div>
@@ -1146,7 +1283,7 @@
   }
 
   function renderSentence() {
-    const { sent, task, chosen, result } = q;
+    const { card, sent, task, chosen, result } = q;
     const chosenSet = new Set(chosen);
     let answerTiles;
     if (result) {
@@ -1156,28 +1293,27 @@
         return `<span class="tile ${result.ok && result.exact ? 'good' : cls}" lang="az">${esc(t.text)}</span>`;
       }).join('');
     } else {
-      answerTiles = chosen.map((id, i) => `<button class="tile" data-act="untile" data-pos="${i}" lang="az">${esc(task.tiles[id].text)}</button>`).join('');
-      // на лёгком уровне видно, сколько слов в предложении
-      if (q.level === 'easy') {
-        for (let i = chosen.length; i < task.answer.length; i++) answerTiles += '<span class="slot" aria-hidden="true"></span>';
-      }
+      answerTiles = chosen.map((id, i) =>
+        `<button class="tile" data-act="untile" data-drag="a" data-pos="${i}" lang="az">${esc(task.tiles[id].text)}</button>`).join('');
+      // пустые ячейки показывают, сколько слов в предложении
+      for (let i = chosen.length; i < task.answer.length; i++) answerTiles += '<span class="slot" aria-hidden="true"></span>';
     }
     const bank = task.tiles.map((t) => chosenSet.has(t.id)
       ? `<span class="tile ghost" aria-hidden="true">${esc(t.text)}</span>`
-      : `<button class="tile" data-act="tile" data-id="${t.id}" lang="az" ${result ? 'disabled' : ''}>${esc(t.text)}</button>`).join('');
+      : `<button class="tile" data-act="tile" data-drag="b" data-id="${t.id}" lang="az" ${result ? 'disabled' : ''}>${esc(t.text)}</button>`).join('');
 
     let fb = '';
     if (result) {
       const title = result.ok
         ? (result.exact ? 'Верно' : 'Верно, но в оригинале порядок другой')
-        : result.gaveUp ? 'Запомните' : result.order ? 'Слова верные, но порядок неправильный' : 'Неверно';
+        : result.gaveUp ? 'Запомните' : result.order ? 'Слова верные, но порядок другой' : 'Неверно';
       fb = `<div class="feedback ${result.ok ? 'ok' : 'bad'}" role="status">
         <div class="fb-title">${title}</div>
-        <div class="fb-pair" lang="az"><b>${esc(sent.az)}</b></div>
+        <div class="fb-pair" lang="az">${markForm(sent.az, sent.form || card.az)}</div>
         <div class="fb-line muted">${esc(sent.ru)}</div>
-        ${sent.checked ? '' : '<div class="fb-line"><em class="chip" title="Новое предложение из документа, его ещё не вычитывали">не проверено</em></div>'}
+        <div class="fb-line"><span class="muted">слово:</span> <b lang="az">${esc(card.az)}</b> — ${esc(card.gloss)}</div>
         <div class="fb-actions">
-          <button class="link" data-act="hide-sent" title="Если предложение распознано с ошибкой">Ошибка в предложении?</button>
+          <button class="link" data-act="hide-sent" title="Если во фразе ошибка">Ошибка во фразе?</button>
           <button class="btn primary" data-act="next">Дальше</button>
         </div>
       </div>`;
@@ -1187,13 +1323,13 @@
       <div class="quiz">
         ${quizTop()}
         <div class="prompt sent-prompt">
-          <div class="label">Соберите по-азербайджански</div>
-          <div class="label chips-line"><em class="chip lvl-${q.level}">${SENT_LEVELS[q.level].label.toLowerCase()}</em> <em class="chip topic">${esc(AzGrammar.TOPICS[sent.topic] || '')}</em>${q.isNew ? ' <em class="chip new">новое</em>' : ''}</div>
+          <div class="label">Соберите фразу со словом <b lang="az">${esc(card.az)}</b></div>
           <div class="word sent">${esc(sent.ru)}</div>
         </div>
-        <div class="answer-zone ${result ? (result.ok ? 'ok' : 'bad') : ''}">${answerTiles || '<span class="placeholder muted">Нажимайте на слова по порядку</span>'}</div>
+        <div class="answer-zone ${result ? (result.ok ? 'ok' : 'bad') : ''}">${answerTiles}</div>
         <div class="bank">${bank}</div>
-        ${result ? fb : `<div class="sent-actions">
+        ${result ? fb : `<p class="drag-hint muted small">Нажмите на слово или перетащите его. Слова в ответе тоже можно двигать.</p>
+        <div class="sent-actions">
           <button class="link" data-act="idk-sent">Не знаю</button>
           ${chosen.length ? '<button class="link" data-act="clear-sent">Сбросить</button>' : ''}
           <button class="btn primary" data-act="check" ${chosen.length ? '' : 'disabled'}>Проверить</button>
@@ -1205,10 +1341,9 @@
 
   function renderSummary() {
     const pct = session.answered ? Math.round((session.correct / session.answered) * 100) : 0;
-    const isSent = session.kind === 'sent';
     const c = counts();
     const st = streak();
-    const more = (isSent ? buildSentQueue() : buildQueue()).length;
+    const more = buildWordQueue(null, WORDS_PER_SESSION).length;
     const left = Math.max(0, S.settings.dailyGoal - dayStat(today()).a);
     $app.innerHTML = `
       <div class="summary">
@@ -1217,12 +1352,13 @@
         <div class="stats">
           <div><b>${session.answered}</b><span>${plural(session.answered, 'ответ', 'ответа', 'ответов')}</span></div>
           <div><b>${pct}%</b><span>верно</span></div>
-          <div><b>${session.newIds.size}</b><span>новых</span></div>
+          <div><b>${session.newIds.size}</b><span>новых слов</span></div>
+          ${session.sentences ? `<div><b>${session.sentences}</b><span>${plural(session.sentences, 'фраза', 'фразы', 'фраз')}</span></div>` : ''}
         </div>
         <p class="muted">${st.todayDone ? `Цель дня выполнена. Серия: ${st.n} ${plural(st.n, 'день', 'дня', 'дней')}.` : `До цели дня: ${left} ${plural(left, 'ответ', 'ответа', 'ответов')}.`}
         Выучено слов: ${c.learned}.</p>
         <div class="col">
-          ${more ? `<button class="btn primary big" data-act="${isSent ? 'start-sent' : 'start'}">Продолжить</button>` : ''}
+          ${more ? '<button class="btn primary big" data-act="start">Продолжить</button>' : ''}
           <button class="btn ${more ? '' : 'primary big'}" data-act="go" data-view="home">На главную</button>
         </div>
       </div>`;
@@ -1285,7 +1421,7 @@
       <div class="chips">${isSent
         ? chip('all', 'Все') + chip('l1', 'Лёгкие') + chip('l2', 'Средние') + chip('l3', 'Сложные') + chip('hidden', 'Скрытые')
         : chip('all', 'Все') + chip('new', 'Новые') + chip('learning', 'Изучаю') + chip('learned', 'Выучено') + chip('edited', 'Исправленные') + chip('hidden', 'Скрытые')}</div>
-      ${isSent ? `<div class="list-topic">${topicSelect(null, 'wtopic')}</div>` : ''}
+      ${isSent ? `<div class="list-topic">${topicSelect()}</div>` : ''}
       ${isSent ? `<p class="muted small list-count">Показано: ${total}</p>` : ''}
       <ul class="wlist">${rows || '<li class="empty muted">Ничего не найдено</li>'}</ul>
       ${total > shown.length ? `<button class="btn wide" data-act="wmore">Показать ещё (${total - shown.length})</button>` : ''}
@@ -1306,16 +1442,16 @@
   }
 
   // выбор грамматической темы; в списке — темы, которые есть на этом уровне, с количеством
-  function topicSelect(level, act) {
-    const pool = level ? sentPool(level, 'all') : SACTIVE;
+  // выбор темы в справочном списке предложений из уроков
+  function topicSelect() {
     const cnt = {};
-    for (const s of pool) cnt[s.topic] = (cnt[s.topic] || 0) + 1;
-    const cur = act === 'wtopic' ? wordsUi.topic || 'all' : sentTopic();
-    const opts = [`<option value="all">Все темы (${pool.length})</option>`].concat(
+    for (const s of SACTIVE) cnt[s.topic] = (cnt[s.topic] || 0) + 1;
+    const cur = wordsUi.topic || 'all';
+    const opts = [`<option value="all">Все темы (${SACTIVE.length})</option>`].concat(
       Object.entries(AzGrammar.TOPICS)
         .filter(([k]) => cnt[k] || k === cur)
         .map(([k, label]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(label)} (${cnt[k] || 0})</option>`));
-    return `<label class="topic-pick"><span>Тема</span><select data-act="${act || 'set-topic'}">${opts.join('')}</select></label>`;
+    return `<label class="topic-pick"><span>Тема</span><select data-act="wtopic">${opts.join('')}</select></label>`;
   }
 
   function seg(name, value, options) {
@@ -1341,11 +1477,9 @@
 
       <section class="card form">
         <div class="field"><span>Новых слов в день</span>${seg('newPerDay', s.newPerDay, [[5, '5'], [10, '10'], [15, '15'], [20, '20'], [30, '30']])}</div>
-        <div class="field"><span>Новых предложений в день</span>${seg('sentPerDay', s.sentPerDay, [[3, '3'], [5, '5'], [8, '8'], [10, '10']])}</div>
-        <div class="field"><span>Сложность предложений</span>${seg('sentLevel', sentLevel(), Object.entries(SENT_LEVELS).map(([k, v]) => [k, v.label]))}</div>
         <div class="field"><span>Цель на день (ответов)</span>${seg('dailyGoal', s.dailyGoal, [[10, '10'], [20, '20'], [30, '30'], [50, '50']])}</div>
         <div class="field"><span>Направление</span>${seg('direction', s.direction, [['auto', 'Авто'], ['az', 'AZ→RU'], ['ru', 'RU→AZ'], ['mix', 'Микс']])}
-          <small class="muted">«Авто»: новые слова — с азербайджанского, выученные — чаще в обратную сторону.</small></div>
+          <small class="muted">«Авто»: новое слово и повтор после ошибки — с азербайджанского, остальные — в обе стороны поровну.</small></div>
         <div class="field"><span>Порядок новых слов</span>${seg('order', s.order, [['fresh', 'Сначала свежие'], ['doc', 'По документу'], ['random', 'Случайно']])}
           <small class="muted">«Сначала свежие» — слова, недавно добавленные в источники (или ближе к концу документа).</small></div>
         <label class="toggle"><span>Пары с английским переводом</span><input type="checkbox" data-act="toggle" data-k="includeEn" ${s.includeEn ? 'checked' : ''}></label>
@@ -1432,11 +1566,9 @@
 
   const ACTIONS = {
     go(el) { view = el.dataset.view; if (view === 'home') session = null; render(); window.scrollTo(0, 0); },
-    start() { startSession(buildQueue(), 'word', 'daily'); },
-    more() { startSession(buildQueue(10), 'word', 'extra'); },
-    hard() { startSession(buildHardQueue(), 'word', 'hard'); },
-    'start-sent'() { startSession(buildSentQueue(), 'sent', 'daily'); },
-    'more-sent'() { startSession(buildSentQueue(5), 'sent', 'extra'); },
+    start() { startSession(buildSession(), 'daily'); },
+    more() { startSession(buildSession(10), 'extra'); },
+    hard() { startSession(buildHardQueue(), 'hard'); },
     sync() { sync({ silent: false }); },
     pick(el) { answer(+el.dataset.i); },
     idk() { answer(-1); },
@@ -1456,10 +1588,10 @@
     card(el) { openFix(el.dataset.id); },
     'hide-sent'() {
       if (!q || q.kind !== 'sent') return;
-      S.shidden[q.sent.id] = true;
+      S.exHidden[q.card.id] = true;
+      exCache.delete(q.card.id);
       save();
-      refreshActive();
-      toast('Предложение скрыто. Вернуть можно в разделе «Слова → Предложения».');
+      toast('Эту фразу больше не будет в тренировке.');
       advance();
     },
     'toggle-hide'(el) {
@@ -1522,6 +1654,8 @@
   };
 
   $app.addEventListener('click', (e) => {
+    // клик, который браузер присылает сразу после перетаскивания плитки, не считается нажатием
+    if (Date.now() - dragEndedAt < 350) return;
     const el = e.target.closest('[data-act]');
     if (!el || el.tagName === 'INPUT') return;
     const fn = ACTIONS[el.dataset.act];
@@ -1530,12 +1664,6 @@
   $app.addEventListener('change', (e) => {
     const el = e.target;
     if (el.matches('input[type=checkbox][data-act]')) ACTIONS[el.dataset.act](el, e);
-    if (el.matches('select[data-act="set-topic"]')) {
-      S.settings.sentTopic = el.value;
-      save();
-      render();
-      updateBadge();
-    }
     if (el.matches('select[data-act="wtopic"]')) {
       wordsUi.topic = el.value;
       wordsUi.limit = 150;
@@ -1623,6 +1751,8 @@
     get sentences() { return SENTS; },
     get state() { return S; },
     get lex() { return LEX; },
+    get session() { return session; },
+    get q() { return q; },
     distractors: pickDistractors,
     example: (c) => exampleFor(c),
     search: (az, lang) => searchSources(ALL.find((c) => c.az === az && (!lang || c.lang === lang))),
