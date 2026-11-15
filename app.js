@@ -151,17 +151,29 @@
   // В тренировку дня они попадают после знакомства в уроках.
   function addBaseCards(cards) {
     const have = new Set(cards.map((c) => c.id));
+    const added = new Map(); // написание → базовые карточки с ним
     BASE.forEach((b, i) => {
       const az = AzParser.azLower(b.az);
-      const id = AzParser.util.hashKey('ru|' + normM(az));
-      if (have.has(id)) return;
+      const meanings = splitMeanings(b.ru).map(normM);
+      const key = AzParser.util.hashKey('ru|' + normM(az));
+      let id = key;
+      if (have.has(id)) {
+        // слово из конспекта важнее; омоним внутри базового словаря (çay — «чай» и «река») — отдельная карточка
+        const same = added.get(key);
+        if (!same || same.some((c) => c.meanings.some((m) => meanings.includes(m)))) return;
+        id = AzParser.util.hashKey('ru|' + normM(az) + '|' + b.t);
+        if (have.has(id)) return;
+      }
       have.add(id);
       const first = b.ru.split(/[,;]/)[0].trim();
-      cards.push({
-        id, az, gloss: b.ru, alts: [], meanings: splitMeanings(b.ru).map(normM), lang: 'ru', src: 'base', line: i,
+      const card = {
+        id, az, gloss: b.ru, alts: [], meanings, lang: 'ru', src: 'base', line: i,
         type: /(maq|mək)$/.test(az) ? 'verb' : az.split(/\s+/).length >= 3 ? 'phrase' : /(ый|ий|ой)$/.test(first) ? 'adj' : 'word',
         examples: [], notes: [], origin: 'base', topic: b.t, baseEx: b.ex || null,
-      });
+      };
+      cards.push(card);
+      if (!added.has(key)) added.set(key, []);
+      added.get(key).push(card);
     });
   }
 
@@ -787,9 +799,14 @@
     // «вставьте слово»: в первую очередь предложения, где пропуск приходится на форму этой темы
     const want = sents.length && !u.noCloze ? (drills ? 3 : 4) : 0;
     const cands = [];
-    for (const s of sents.slice(0, 40)) {
+    const gaps = new Set();
+    for (const s of want ? sents.slice(0, 60) : []) {
       const cz = AzGrammar.makeCloze(s, u.focus, LEX);
       if (!cz) continue;
+      // одно и то же слово не пропускаем дважды за урок
+      const gap = AzParser.azLower(cz.word);
+      if (gaps.has(gap)) continue;
+      gaps.add(gap);
       cands.push({ s, cz, hit: cz.hit });
       if (cands.filter((x) => x.hit).length >= want) break;
     }
@@ -968,7 +985,8 @@
       if (c.id === card.id || c.lang !== card.lang) continue;
       const t = text(c);
       if (t === target || c.meanings.some((m) => tMean.has(m))) continue;
-      if (dir === 'rev' && fold(c.az) === fold(card.az)) continue;
+      // то же написание с другим значением (çay — «чай» и «река») неправильным вариантом быть не может
+      if (fold(c.az) === fold(card.az)) continue;
       let s = 0;
       if (c.type === card.type) s += 3;
       if (wc(t) === tWc) s += 1;
