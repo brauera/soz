@@ -189,7 +189,31 @@
   // лица глагола: gəlirəm → gəlirsən, gəlir, gəlmirəm; getdim → getdin; gələcəyəm → gələcək
   function verbVariants(w) {
     const out = [];
-    let m = /^(.{2,}?)(y?)(ır|ir|ur|ür)(am|əm|san|sən|ıq|ik|uq|ük|sınız|siniz|sunuz|sünüz|lar|lər)?$/.exec(w);
+    // перфект проверяем первым: «gəlmişdir» иначе примется за настоящее время на -ir
+    let m = /^(.{2,}?)(mış|miş|muş|müş)(am|əm|san|sən|dır|dir|dur|dür|ıq|ik|uq|ük|sınız|siniz|sunuz|sünüz|lar|lər)?$/.exec(w);
+    if (m) {
+      const v = m[2][1];
+      const back = 'ıu'.includes(v);
+      const base = m[1] + m[2];
+      const persons = [back ? 'am' : 'əm', back ? 'san' : 'sən', pick4(v, ['dır', 'dir', 'dur', 'dür']),
+        pick4(v, ['ıq', 'ik', 'uq', 'ük']), pick4(v, ['sınız', 'siniz', 'sunuz', 'sünüz']), back ? 'lar' : 'lər'];
+      for (const p of persons) out.push(base + p);
+      // и простое прошедшее: baxmışam → baxdım
+      out.push(m[1] + pick4(v, ['dı', 'di', 'du', 'dü']) + 'm');
+      return out.filter((x) => x !== w);
+    }
+    // связка: haradadır → haradayam, haradasan… (gedir, eşidir — глаголы, а не связка)
+    m = /^(.{2,}?)(dır|dir|dur|dür)(lar|lər)?$/.exec(w);
+    if (m && !/^(ed|ged|qayıd|eşid|unud|dad)$/.test(m[1] + 'd')) {
+      const v = m[2][1];
+      const back = 'ıu'.includes(v);
+      const y = /[aeəiıoöuü]$/.test(m[1]) ? 'y' : '';
+      const forms = [m[1] + y + (back ? 'am' : 'əm'), m[1] + (back ? 'san' : 'sən'), m[1] + m[2],
+        m[1] + y + pick4(v, ['ıq', 'ik', 'uq', 'ük']), m[1] + pick4(v, ['sınız', 'siniz', 'sunuz', 'sünüz']),
+        m[1] + m[2] + (back ? 'lar' : 'lər')];
+      return forms.filter((x) => x !== w);
+    }
+    m = /^(.{2,}?)(y?)(ır|ir|ur|ür)(am|əm|san|sən|ıq|ik|uq|ük|sınız|siniz|sunuz|sünüz|lar|lər)?$/.exec(w);
     if (m) {
       const base = m[1] + m[2] + m[3];
       const v = m[3][0];
@@ -391,6 +415,47 @@
     return { ok: false, exact: false, order: true };
   }
 
+  /*
+   * «Вставьте пропущенное слово»: из предложения убирается слово с нужной грамматикой
+   * (focus — признак темы урока, например окончание прошедшего времени), а в вариантах —
+   * другие формы этого же слова: лица, времена, падежи. Если подходящего слова нет — null.
+   */
+  function makeCloze(sentence, focus, lex) {
+    const raw = sentence.az.split(/\s+/);
+    const words = raw.map((w) => w.replace(/^[«"“(]+|[»"”).,!?;:]+$/g, ''));
+    const lower = words.map((w) => azLower(w));
+    const inSentence = new Set(lower);
+    const variantsOf = (w) => {
+      const gen = shuffle([...verbVariants(w), ...caseVariants(w, lex.set), ...pronounVariants(w)]);
+      const real = shuffle(neighbors(w, lex));
+      const out = [];
+      for (const v of gen.concat(real)) {
+        if (v && v.length >= 2 && !inSentence.has(v) && !out.includes(v)) out.push(v);
+      }
+      return out;
+    };
+    // сначала слова, подходящие под тему урока, от конца предложения (там обычно глагол)
+    const idx = lower.map((w, i) => i).filter((i) => LETTER.test(words[i]) && lower[i].length >= 2);
+    // focus — RegExp или объект с test(слово, номер, все слова), если тему видно только по соседям
+    const hits = idx.filter((i) => !!focus && focus.test(lower[i], i, lower));
+    const order = hits.slice().reverse().concat(idx.filter((i) => !hits.includes(i)).reverse());
+    for (const i of order) {
+      const wrong = variantsOf(lower[i]).slice(0, 3);
+      if (wrong.length < 3) continue;
+      // в начале предложения варианты показываем с заглавной, как в самом предложении
+      const cap = (w) => (i === 0 && /^[A-ZƏĞİÖÜŞÇ]/.test(words[i]) ? w.charAt(0).toLocaleUpperCase('az') + w.slice(1) : w);
+      const correct = words[i];
+      const options = shuffle([{ text: correct, correct: true }].concat(wrong.map((w) => ({ text: cap(w), correct: false }))));
+      const before = raw.slice(0, i).join(' ');
+      const after = raw.slice(i + 1).join(' ');
+      // знаки препинания вокруг слова остаются на месте
+      const lead = (raw[i].match(/^[«"“(]+/) || [''])[0];
+      const trail = (raw[i].match(/[»"”).,!?;:]+$/) || [''])[0];
+      return { gap: i, word: words[i], before, after, lead, trail, options, hit: hits.includes(i) };
+    }
+    return null;
+  }
+
   /* ---------- категории ---------- */
 
   const TOPICS = {
@@ -439,5 +504,5 @@
     return { level, topic };
   }
 
-  global.AzGrammar = { extract, makeTask, buildLexicon, check, tokens, classify, TOPICS, _variants: { verbVariants, caseVariants, pronounVariants } };
+  global.AzGrammar = { extract, makeTask, makeCloze, buildLexicon, check, tokens, classify, TOPICS, _variants: { verbVariants, caseVariants, pronounVariants } };
 })(typeof window !== 'undefined' ? window : globalThis);

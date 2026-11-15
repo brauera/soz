@@ -1,14 +1,17 @@
 // Кеширует оболочку приложения, чтобы тренажёр открывался без интернета.
 // При изменении любого файла приложения увеличьте номер версии.
-const VERSION = 'soz-v9';
+const VERSION = 'soz-v10';
 const ASSETS = [
   './',
   './styles.css',
   './parser.js',
   './grammar.js',
   './drills.js',
+  './units.js',
   './data/phrases.json',
   './data/drill-words.json',
+  './data/word-topics.json',
+  './data/base.json',
   './data/konspekt-pdf.txt',
   './data/sentences-fixes.json',
   './data/examples.json',
