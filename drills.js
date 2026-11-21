@@ -52,12 +52,17 @@
     const fut = back
       ? ['ğam', 'qsan', 'q', 'ğıq', 'qsınız', 'qlar']
       : ['yəm', 'ksən', 'k', 'yik', 'ksiniz', 'klər'];
+    // «magic table» (давай, пусть, следует, можно, чтобы): gedim, gedəsən, getsin, gedək, gedəsiniz, getsinlər
+    const vs = endsVowel(ps) ? ps + 'y' : ps;
+    const opt = [vs + h + 'm', vs + (back ? 'asan' : 'əsən'), stem + 's' + h + 'n', vs + (back ? 'aq' : 'ək'),
+      vs + (back ? 'asınız' : 'əsiniz'), stem + 's' + h + 'n' + (back ? 'lar' : 'lər')];
     return {
       pres: persons.map((e) => pre + presBase + e),
       past: pastEnd.map((e) => pre + stem + 'd' + h + e),
       negp: persons.map((e) => pre + stem + 'm' + h + 'r' + e),
       negd: negPastEnd.map((e) => pre + stem + (back ? 'mad' + 'ı' : 'məd' + 'i') + e),
       fut: fut.map((e) => pre + futStem + e),
+      opt: opt.map((f) => pre + f),
     };
   }
 
@@ -93,7 +98,17 @@
     negp: { ask: 'не … (сейчас)', other: 'pres' },
     negd: { ask: 'не … (вчера)', other: 'past' },
     fut: { ask: 'завтра', other: 'pres' },
+    opt: { ask: 'давай, пусть, чтобы', other: 'pres' },
   };
+  // «magic table»: слово-сигнал перед глаголом, по лицам — [начало фразы, что оно значит]
+  const OPT_LEADS = [
+    [['Qoy mən', 'позволь, я …'], ['Gərək mən', 'мне следует …'], ['Olar mən', 'можно я …?'], ['İstəyirsən ki, mən', 'ты хочешь, чтобы я …']],
+    [['Gərək sən', 'тебе следует …'], ['İstəyirəm ki, sən', 'я хочу, чтобы ты …']],
+    [['Qoy o', 'пусть он …'], ['Gərək o', 'ему следует …'], ['Olar o', 'можно он …?'], ['İstəyirəm ki, o', 'я хочу, чтобы он …']],
+    [['Gəl', 'давай …'], ['Gəlin', 'давайте …'], ['Gərək biz', 'нам следует …'], ['Olar biz', 'можно мы …?']],
+    [['Gərək siz', 'вам следует …'], ['İstəyirəm ki, siz', 'я хочу, чтобы вы …']],
+    [['Qoy onlar', 'пусть они …'], ['Gərək onlar', 'им следует …'], ['İstəyirəm ki, onlar', 'я хочу, чтобы они …']],
+  ];
   const RULES = {
     loc: 'Где? → -da / -də. После a, ı, o, u — -da, после e, ə, i, ö, ü — -də.',
     dat: 'Куда? → -a / -ə, после гласной -ya / -yə. Конечные q и k перед гласной переходят в ğ и y: otaq → otağa.',
@@ -108,6 +123,7 @@
     negp: 'Не (сейчас): после основы вставляется -m-: gəl-ir → gəl-m-ir, işlə-yir → işlə-m-ir. Лицо как обычно.',
     negd: 'Не (вчера): основа + -ma / -mə + -dı / -di + лицо: gəl-mə-di-m, al-ma-dı-m.',
     fut: 'Завтра: основа + -acaq / -əcək (после гласной -yacaq / -yəcək). В «я» и «мы» q → ğ, k → y: alacağam, gələcəyik.',
+    opt: 'После Gəl (давай), Qoy (пусть), Gərək (следует), Olar (можно) и «… ki,» (чтобы): mən -ım/-im/-um/-üm, sən -asan/-əsən, o -sın/-sin/-sun/-sün, biz -aq/-ək, siz -asınız/-əsiniz, onlar -sınlar/-sinlər. После гласной вставляется y: oxuyum, işləyək.',
     cop: 'Я — …, ты — …: к слову добавляется лицо: -am/-əm, -san/-sən, -dır/-dir/-dur/-dür, -ıq/-ik/-uq/-ük, -sınız…, -dırlar. После гласной в «я» и «мы» вставляется y: yaxşıyam.',
   };
 
@@ -186,8 +202,10 @@
       shuffle(harmonyErrors(correct, stem)).slice(0, 1),
       [v[VERB_TYPES[type].other][p]],
       shuffle(forms.filter((_, i) => i !== p && i !== NEAR[p])));
+    // в «magic table» вместо местоимения показываем начало фразы: «Qoy o …», «Gəl …»
+    const lead = type === 'opt' ? pick(OPT_LEADS[p]) : null;
     return {
-      type, word: v.az, ru: v.ru, person: PERSONS[p], ask: VERB_TYPES[type].ask,
+      type, word: v.az, ru: v.ru, person: lead ? lead[0] : PERSONS[p], ask: lead ? lead[1] : VERB_TYPES[type].ask,
       options: finish(correct, wrong),
       rule: RULES[type],
       table: forms.map((f, i) => [PERSONS[i], f]),

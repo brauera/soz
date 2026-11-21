@@ -792,8 +792,9 @@
     }
 
     if (u.quiz) {
-      const n = Math.min(QUIZ_PER_LESSON, u.quiz.length);
-      const start = (st.n * QUIZ_PER_LESSON) % u.quiz.length;
+      const per = u.quizPer || QUIZ_PER_LESSON;
+      const n = Math.min(per, u.quiz.length);
+      const start = (st.n * per) % u.quiz.length;
       for (let k = 0; k < n; k++) items.push({ t: 'z', u: u.id, i: (start + k) % u.quiz.length });
     }
     // «вставьте слово»: в первую очередь предложения, где пропуск приходится на форму этой темы
@@ -801,7 +802,7 @@
     const cands = [];
     const gaps = new Set();
     for (const s of want ? sents.slice(0, 60) : []) {
-      const cz = AzGrammar.makeCloze(s, u.focus, LEX);
+      const cz = AzGrammar.makeCloze(s, u.focus, LEX, u.variants);
       if (!cz) continue;
       // одно и то же слово не пропускаем дважды за урок
       const gap = AzParser.azLower(cz.word);
@@ -1784,7 +1785,7 @@
         sub = `<div class="drill-sub">${esc(d.ru)}</div>`;
         azOptions = d.type === 'numw';
       } else {
-        label = 'Окончания';
+        label = d.type === 'opt' ? 'Magic table' : 'Окончания';
         prompt = d.person
           ? `<div class="word" lang="az">${esc(d.person)} …</div>`
           : `<div class="word"><span lang="az">${esc(d.word)}</span> <span class="plus">+</span> <span class="ask">${esc(d.ask)}</span></div>`;

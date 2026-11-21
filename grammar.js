@@ -416,29 +416,60 @@
   }
 
   /*
+   * «Magic table» — формы после gəl / qoy / gərək / olar / ki. По одной форме (getsin, gedək, oxuyum)
+   * восстанавливает остальные лица: gedim, gedəsən, getsin, gedək, gedəsiniz, getsinlər.
+   */
+  const Y_STEMS = new Set(['qoy', 'duy', 'gey', 'say', 'yay', 'döy', 'doy', 'soy']);
+  function optForms(w) {
+    let stem = null;
+    let m = /^(.+?)(sın|sin|sun|sün)(lar|lər)?$/.exec(w);
+    if (m) stem = m[1];
+    else {
+      m = /^(.+?)(y?)(asınız|əsiniz|asan|əsən|aq|ək|ım|im|um|üm)$/.exec(w);
+      // y после гласной — вставка (oxu-y-aq), но у qoymaq, geymək она часть основы
+      if (m) stem = m[2] && Y_STEMS.has(m[1] + 'y') ? m[1] + 'y' : m[1];
+    }
+    const vowels = stem && stem.length >= 2 ? stem.match(/[aeəiıoöuü]/g) : null;
+    if (!vowels) return [];
+    const last = vowels[vowels.length - 1];
+    const back = 'aıou'.includes(last);
+    const v4 = pick4(last, ['ı', 'i', 'u', 'ü']);
+    // getmək, etmək: перед гласной ged-, ed-, перед согласной get-, et-
+    const td = /^(ge|e)[dt]$/.test(stem);
+    const vs = (td ? stem.slice(0, -1) + 'd' : stem) + (/[aeəiıoöuü]$/.test(stem) ? 'y' : '');
+    const cs = td ? stem.slice(0, -1) + 't' : stem;
+    return [vs + v4 + 'm', vs + (back ? 'asan' : 'əsən'), cs + 's' + v4 + 'n', vs + (back ? 'aq' : 'ək'),
+      vs + (back ? 'asınız' : 'əsiniz'), cs + 's' + v4 + 'n' + (back ? 'lar' : 'lər')].filter((x) => x !== w);
+  }
+
+  /*
    * «Вставьте пропущенное слово»: из предложения убирается слово с нужной грамматикой
    * (focus — признак темы урока, например окончание прошедшего времени), а в вариантах —
    * другие формы этого же слова: лица, времена, падежи. Если подходящего слова нет — null.
    */
-  function makeCloze(sentence, focus, lex) {
+  function makeCloze(sentence, focus, lex, extra) {
     const raw = sentence.az.split(/\s+/);
     const words = raw.map((w) => w.replace(/^[«"“(]+|[»"”).,!?;:]+$/g, ''));
     const lower = words.map((w) => azLower(w));
     const inSentence = new Set(lower);
     const variantsOf = (w) => {
+      // extra — свои варианты блока (например, другие лица из «magic table»), они идут первыми
+      const own = extra ? shuffle((extra(w) || []).slice()) : [];
       const gen = shuffle([...verbVariants(w), ...caseVariants(w, lex.set), ...pronounVariants(w)]);
       const real = shuffle(neighbors(w, lex));
       const out = [];
-      for (const v of gen.concat(real)) {
+      for (const v of own.concat(gen, real)) {
         if (v && v.length >= 2 && !inSentence.has(v) && !out.includes(v)) out.push(v);
       }
       return out;
     };
     // сначала слова, подходящие под тему урока, от конца предложения (там обычно глагол)
     const idx = lower.map((w, i) => i).filter((i) => LETTER.test(words[i]) && lower[i].length >= 2);
-    // focus — RegExp или объект с test(слово, номер, все слова), если тему видно только по соседям
+    // focus — RegExp или объект с test(слово, номер, все слова), если тему видно только по соседям;
+    // focus.random — брать любое из подходящих слов, а не последнее
     const hits = idx.filter((i) => !!focus && focus.test(lower[i], i, lower));
-    const order = hits.slice().reverse().concat(idx.filter((i) => !hits.includes(i)).reverse());
+    const order = (focus && focus.random ? shuffle(hits.slice()) : hits.slice().reverse())
+      .concat(idx.filter((i) => !hits.includes(i)).reverse());
     for (const i of order) {
       const wrong = variantsOf(lower[i]).slice(0, 3);
       if (wrong.length < 3) continue;
@@ -504,5 +535,5 @@
     return { level, topic };
   }
 
-  global.AzGrammar = { extract, makeTask, makeCloze, buildLexicon, check, tokens, classify, TOPICS, _variants: { verbVariants, caseVariants, pronounVariants } };
+  global.AzGrammar = { extract, makeTask, makeCloze, optForms, buildLexicon, check, tokens, classify, TOPICS, _variants: { verbVariants, caseVariants, pronounVariants } };
 })(typeof window !== 'undefined' ? window : globalThis);

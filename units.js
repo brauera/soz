@@ -21,6 +21,10 @@
   const PRON = /^(bun|on|kim|nəy|siz|biz|mən|sən)(lar|lər)?(un|ün|in|ım|im|dan|dən|da|də|a|ə|u|ü|i|ı)?$/;
   // глаголы на -d: их настоящее время (edir, gedir) выглядит как связка -dir
   const D_VERB = '(?:ed|ged|qayıd|eşid|unud|dad)[ıiuü]r';
+  // «magic table»: слова-сигналы и окончания глагола после них (getsin, gedəsən, gedək, edim, alım).
+  // -dım и -acaq в конце — это прошедшее и будущее время, а не форма из таблицы.
+  const SIGNALS = ['qoy', 'gəl', 'gərək', 'olar'];
+  const OPT_END = '(?:s[ıiuü]n(?:lar|lər)?|[aə]s[aə]n|[aə]s[ıi]n[ıi]z|(?<![a-zəğıöüşç])(?:ge|e)dim|(?<!d)[ıiuü]m|(?<!c)[aə][qk])';
 
   const UNITS = [
     {
@@ -244,6 +248,75 @@
         { p: 'Запрет — -ma / -mə: getmə — не уходи, getməyin — не уходите.' },
         { p: '«Давай(те)» — -aq / -ək: gedək — пойдём. «Пусть» — qoy и глагол на -sın.' },
         { ex: [['Zəhmət olmasa, burada saxlayın.', 'Пожалуйста, остановите здесь.'], ['Gəl, çay içək.', 'Давай попьём чаю.'], ['Narahat olma.', 'Не волнуйся.'], ['Qoy gəlsin.', 'Пусть придёт.']] },
+      ],
+    },
+    {
+      // «Magic table» из конспекта: одна таблица окончаний на «давай», «пусть», «следует», «можно» и «чтобы»
+      id: 'g-magic', kind: 'g', title: 'Magic table: давай, пусть, чтобы', sub: 'gəl gedək, qoy gəlsin, gərək biləsən',
+      drills: ['opt'], quizPer: 3,
+      // фраза начинается со слова-сигнала или содержит «ki,», а кончается глаголом с окончанием из таблицы
+      sent: { re: new RegExp('^(?=(qoy|gəl|gəlin|gərək|olar)[\\s,]|.*\\ski,?\\s).*' + OPT_END + '[.!?]*$', 'i') },
+      // пропуск — либо слово-сигнал в начале, либо глагол в конце
+      focus: {
+        random: true,
+        test(w, i, all) {
+          if (i === 0) return SIGNALS.includes(w) || w === 'gəlin';
+          return !!all && i === all.length - 1 && new RegExp(OPT_END + '$').test(w);
+        },
+      },
+      variants(w) {
+        if (SIGNALS.includes(w)) return SIGNALS.filter((x) => x !== w);
+        if (w === 'gəlin') return SIGNALS.filter((x) => x !== 'gəl');
+        return global.AzGrammar ? global.AzGrammar.optForms(w) : [];
+      },
+      guide: [
+        { p: 'Одна таблица окончаний работает сразу в пяти случаях: «давай», «пусть / позволь», «следует», «можно?» и «чтобы». В начале фразы стоит слово-сигнал, в конце — глагол с окончанием по лицу.' },
+        { ex: [
+          ['Gəl … / Gəlin …', 'давай / давайте'],
+          ['Qoy …', 'пусть, позволь, разреши'],
+          ['Gərək …', 'следует, надо бы'],
+          ['Olar …?', 'можно …?'],
+          ['… ki, …', '…, чтобы …'],
+        ] },
+        { p: 'Окончания. Гласная выбирается по гармонии; если основа кончается на гласную, перед гласной окончания вставляется y: oxu-y-um, но oxu-sun.' },
+        { ex: [
+          ['mən — gedim, alım, oxuyum', '-ım / -im / -um / -üm'],
+          ['sən — gedəsən, alasan, oxuyasan', '-asan / -əsən'],
+          ['o — getsin, alsın, oxusun', '-sın / -sin / -sun / -sün'],
+          ['biz — gedək, alaq, oxuyaq', '-aq / -ək'],
+          ['siz — gedəsiniz, alasınız, oxuyasınız', '-asınız / -əsiniz'],
+          ['onlar — getsinlər, alsınlar, oxusunlar', '-sınlar / -sinlər / -sunlar / -sünlər'],
+        ] },
+        { ex: [
+          ['Gəl birlikdə işləyək!', 'Давай работать вместе!'],
+          ['Qoy o, axşam zəng vursun.', 'Пусть он позвонит вечером.'],
+          ['Qoy mən sənə kömək edim.', 'Позволь, я тебе помогу.'],
+          ['Gərək siz diqqətli olasınız.', 'Вам следует быть внимательными.'],
+          ['Olar, biz girək?', 'Можно нам войти?'],
+          ['Mən istəyirəm ki, sən ora gedəsən.', 'Я хочу, чтобы ты пошёл туда.'],
+        ] },
+        { p: 'Отрицание — -ma / -mə перед окончанием: Qoy o gəlməsin — пусть он не приходит. Bacım xahiş etdi ki, onlar gecikməsinlər — сестра попросила, чтобы они не опаздывали.' },
+        { p: 'У getmək и etmək перед гласной t переходит в d: gedim, gedək, edəsən, но getsin, etsin.' },
+      ],
+      quiz: [
+        { q: 'С какого слова начинается «Давай…»?', a: 'Gəl', w: ['Qoy', 'Gərək', 'Olar'] },
+        { q: 'С какого слова начинается «Пусть он…» или «Позволь мне…»?', a: 'Qoy', w: ['Gəl', 'Gərək', 'Olar'] },
+        { q: 'С какого слова начинается «Тебе следует…»?', a: 'Gərək', w: ['Qoy', 'Gəl', 'Olar'] },
+        { q: 'С какого слова начинается «Можно я…?»', a: 'Olar', w: ['Qoy', 'Gəl', 'Gərək'] },
+        { q: 'Как начать «Я хочу, чтобы ты…»?', a: 'Mən istəyirəm ki, sən …', w: ['Mən istəyirəm üçün sən …', 'Mən istəyirəm çünki sən …', 'Mən istəyirəm əgər sən …'] },
+        { q: 'Какое окончание в magic table у «biz»?', a: '-aq / -ək', w: ['-sın / -sin', '-asan / -əsən', '-ım / -im'] },
+        { q: 'Какое окончание в magic table у «o»?', a: '-sın / -sin / -sun / -sün', w: ['-aq / -ək', '-asan / -əsən', '-ım / -im / -um / -üm'] },
+        { q: 'Какое окончание в magic table у «sən»?', a: '-asan / -əsən', w: ['-sın / -sin', '-aq / -ək', '-asınız / -əsiniz'] },
+        { q: 'Какое окончание в magic table у «mən»?', a: '-ım / -im / -um / -üm', w: ['-aq / -ək', '-sın / -sin / -sun / -sün', '-asan / -əsən'] },
+        { q: '«Пусть он придёт»: Qoy o … (gəlmək)', a: 'gəlsin', w: ['gələk', 'gələsən', 'gəlim'] },
+        { q: '«Давай пойдём»: Gəl … (getmək)', a: 'gedək', w: ['getsin', 'gedim', 'gedəsən'] },
+        { q: '«Тебе следует знать»: Gərək sən … (bilmək)', a: 'biləsən', w: ['bilsin', 'bilək', 'bilim'] },
+        { q: '«Позволь, я скажу»: Qoy mən … (demək)', a: 'deyim', w: ['desin', 'deyək', 'deyəsən'] },
+        { q: '«Пусть они подождут»: Qoy onlar … (gözləmək)', a: 'gözləsinlər', w: ['gözləyək', 'gözləyəsiniz', 'gözləyim'] },
+        { q: '«Вам следует быть внимательными»: Gərək siz diqqətli … (olmaq)', a: 'olasınız', w: ['olsunlar', 'olaq', 'olasan'] },
+        { q: '«Можно мы войдём?»: Olar, biz … (girmək)', a: 'girək', w: ['girsin', 'girim', 'girəsiniz'] },
+        { q: 'Как сказать «Пусть он не приходит»?', a: 'Qoy o gəlməsin.', w: ['Qoy o gəlmir.', 'Qoy o gəlmədi.', 'Qoy o gəlməyək.'] },
+        { q: 'Как сказать «Я хочу, чтобы вы это прочитали»?', a: 'Mən istəyirəm ki, siz bunu oxuyasınız.', w: ['Mən istəyirəm ki, siz bunu oxusun.', 'Mən istəyirəm ki, siz bunu oxuyaq.', 'Mən istəyirəm ki, siz bunu oxuyursunuz.'] },
       ],
     },
     { id: 's-act', kind: 's', title: 'Действия', sub: 'etmək, başlamaq, dəyişmək', topic: 'act' },
